@@ -9,11 +9,15 @@ Place files in `assets/images/`:
 - `menu_background.png` or `menu_background.jpg` - main menu background
 - `settings_background.png` or `settings_background.jpg` - settings screen background
 - `forest_background.png` or `forest_background.jpg` - level 1 forest background
-- `forest_layer_1.png` ... `forest_layer_7.png` - optional parallax layers for level 1, from far back to front
-  The game uses these files first. If any of them are missing, it can fall back to `forest_layer_1_auto.png` ... `forest_layer_7_auto.png`.
+- `forest_layer_1.png` ... `forest_layer_12.png` - parallax layers for level 1, from far back to front
+  If any of them are missing, the game can fall back to `forest_layer_1_auto.png` ... `forest_layer_12_auto.png` where available.
 - `player_idle.png` or `dipper_idle.png` - player idle sprite
 - `player_run_1.png` or `dipper_run_1.png` - first running frame
 - `player_run_2.png` or `dipper_run_2.png` - second running frame
+- `player_run_3.png` or `dipper_run_3.png` - third running frame
+- `player_run_4.png` or `dipper_run_4.png` - fourth running frame
+- `gnome_idle.png` - idle frame for the level 1 gnome enemy
+- `gnome_run_1.png` ... `gnome_run_4.png` - running animation frames for the level 1 gnome enemy
 - `bunker_background.png` or `bunker_background.jpg` - level 2 bunker background
 - `boss_background.png` or `boss_background.jpg` - level 3 boss arena background
 - `settings_panel.png` - large central panel for the settings screen

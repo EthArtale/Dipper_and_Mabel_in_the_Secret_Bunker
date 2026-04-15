@@ -12,7 +12,7 @@ import pygame
 
 WIDTH, HEIGHT = 1280, 720
 GROUND_Y = HEIGHT - 110
-FOREST_GROUND_Y = GROUND_Y + 34
+FOREST_GROUND_Y = GROUND_Y + 52
 FPS = 60
 TITLE = "Dipper and Mabel in the Secret Bunker"
 
@@ -30,10 +30,18 @@ BLACK = (16, 14, 20)
 WHITE = (245, 244, 232)
 
 FOREST_LAYER_OVERRIDES = {
-    1: {"speed": 0.26},
-    2: {"speed": 0.23},
-    3: {"speed": 0.20},
-    4: {"scale": 0.55, "offset_y": 310, "center_x": True, "repeat": False, "speed": 0.15},
+    1: {"speed": 0.05, "scale": 1.25, "offset_y": -175},
+    2: {"speed": 0.08, "scale": 1.25, "offset_y": -175},
+    3: {"speed": 0.11, "scale": 1.25, "offset_y": -175},
+    4: {"speed": 0.14, "scale": 1.25, "offset_y": -175},
+    5: {"speed": 0.18, "scale": 1.25, "offset_y": -175},
+    6: {"speed": 0.22, "scale": 1.25, "offset_y": -175},
+    7: {"speed": 0.27, "scale": 1.25, "offset_y": -175},
+    8: {"speed": 0.33, "scale": 1.25, "offset_y": -175},
+    9: {"speed": 0.40, "scale": 1.25, "offset_y": -175},
+    10: {"speed": 0.48, "scale": 1.25, "offset_y": -175},
+    11: {"speed": 0.57, "scale": 1.25, "offset_y": -175},
+    12: {"speed": 0.67, "scale": 1.25, "offset_y": -175},
 }
 
 PARALLAX_IMAGE_CACHE = {}
@@ -114,6 +122,146 @@ def scale_to_rect(image, size):
     return pygame.transform.smoothscale(image, size)
 
 
+def mix_color(color_a, color_b, blend):
+    blend = clamp(blend, 0.0, 1.0)
+    return tuple(int(color_a[i] * (1 - blend) + color_b[i] * blend) for i in range(3))
+
+
+def shift_color(color, amount):
+    return tuple(clamp(channel + amount, 0, 255) for channel in color)
+
+
+def draw_forest_ground(surface, top_y, camera_x):
+    rect = pygame.Rect(0, top_y, WIDTH, HEIGHT - top_y)
+    base = (42, 66, 44)
+    mid = (57, 83, 52)
+    shadow = (30, 48, 31)
+    moss = (94, 124, 72)
+    root = (66, 52, 34)
+    stone = (82, 88, 66)
+
+    pygame.draw.rect(surface, base, rect)
+    pygame.draw.rect(surface, mid, (0, top_y, WIDTH, 22))
+    pygame.draw.rect(surface, shadow, (0, top_y + 22, WIDTH, 18))
+
+    tick = pygame.time.get_ticks()
+    for x in range(-24, WIDTH + 48, 46):
+        drift = int((camera_x * 0.35 + x * 0.3) % 46)
+        blade_x = x - drift
+        blade_h = 8 + ((x // 23) % 8)
+        pygame.draw.line(surface, moss, (blade_x, top_y + 4), (blade_x + 3, top_y - blade_h), 2)
+        pygame.draw.line(surface, shift_color(moss, -18), (blade_x + 6, top_y + 5), (blade_x + 8, top_y - blade_h + 2), 2)
+
+    for x in range(-40, WIDTH + 80, 74):
+        root_x = x - int(camera_x * 0.5) % 74
+        root_width = 18 + (x // 37) % 12
+        pygame.draw.ellipse(surface, root, (root_x, top_y + 10, root_width, 10))
+
+    for x in range(-20, WIDTH + 40, 54):
+        stone_x = x - int(camera_x * 0.22) % 54
+        stone_y = top_y + 26 + ((x // 27) % 4) * 10
+        stone_w = 10 + (x // 17) % 7
+        pygame.draw.ellipse(surface, stone, (stone_x, stone_y, stone_w, 6))
+        pygame.draw.ellipse(surface, shift_color(stone, -16), (stone_x + 2, stone_y + 2, max(4, stone_w - 4), 3))
+
+    for y in range(top_y + 46, HEIGHT, 24):
+        band = mix_color(base, shadow, min(1.0, (y - top_y) / max(1, HEIGHT - top_y)))
+        pygame.draw.line(surface, band, (0, y), (WIDTH, y))
+
+    for x in range(-30, WIDTH + 60, 64):
+        root_x = x - int(camera_x * 0.4) % 64
+        root_len = 18 + (x // 31) % 18
+        pygame.draw.line(surface, shift_color(root, -6), (root_x, top_y + 28), (root_x - 6, top_y + 28 + root_len), 2)
+        pygame.draw.line(surface, shift_color(root, 8), (root_x + 10, top_y + 24), (root_x + 14, top_y + 18 + root_len), 2)
+
+    haze = pygame.Surface((WIDTH, max(1, HEIGHT - top_y)), pygame.SRCALPHA)
+    haze.fill((255, 231, 181, 10 + int(6 * math.sin(tick * 0.0015))))
+    surface.blit(haze, (0, top_y))
+
+
+def draw_stone_surface(surface, rect, palette, camera_x=0, border_radius=6):
+    top = palette["top"]
+    mid = palette["mid"]
+    shadow = palette["shadow"]
+    crack = palette["crack"]
+    highlight = palette["highlight"]
+    accent = palette.get("accent", highlight)
+
+    pygame.draw.rect(surface, mid, rect, border_radius=border_radius)
+    top_band_h = max(8, rect.height // 3)
+    pygame.draw.rect(surface, top, (rect.x, rect.y, rect.width, top_band_h), border_radius=border_radius)
+    pygame.draw.rect(surface, shadow, (rect.x, rect.bottom - max(6, rect.height // 4), rect.width, max(6, rect.height // 4)), border_radius=border_radius)
+
+    for x in range(rect.x - 20, rect.right + 20, 34):
+        seam_x = x - int(camera_x * 0.18) % 34
+        pygame.draw.line(surface, shift_color(mid, -12), (seam_x, rect.y + 4), (seam_x + 6, rect.bottom - 5), 1)
+
+    for x in range(rect.x + 10, rect.right - 10, 42):
+        pebble_y = rect.y + top_band_h + ((x // 21) % 3) * 5
+        pygame.draw.ellipse(surface, accent, (x - int(camera_x * 0.12) % 18, pebble_y, 12, 5))
+
+    crack_start = rect.x + 18 - int(camera_x * 0.1) % 24
+    for x in range(crack_start, rect.right - 18, 46):
+        points = [
+            (x, rect.y + top_band_h - 2),
+            (x + 6, rect.y + top_band_h + 6),
+            (x - 2, rect.y + top_band_h + 12),
+            (x + 10, rect.bottom - 8),
+        ]
+        pygame.draw.lines(surface, crack, False, points, 2)
+
+    pygame.draw.line(surface, highlight, (rect.x + 4, rect.y + 3), (rect.right - 4, rect.y + 3), 2)
+    pygame.draw.line(surface, shift_color(shadow, -10), (rect.x + 4, rect.bottom - 3), (rect.right - 4, rect.bottom - 3), 2)
+
+
+def draw_flashlight_beam(surface, origin, facing, active=True):
+    if not active:
+        return
+    tick = pygame.time.get_ticks()
+    flicker = 0.96 + 0.04 * math.sin(tick * 0.01)
+    beam_w = 210
+    beam_h = 132
+    beam = pygame.Surface((beam_w, beam_h), pygame.SRCALPHA)
+
+    outer = [(10, beam_h // 2), (102, 22), (beam_w - 12, 38), (beam_w - 12, beam_h - 38), (102, beam_h - 22)]
+    mid = [(14, beam_h // 2), (92, 36), (beam_w - 34, 48), (beam_w - 34, beam_h - 48), (92, beam_h - 36)]
+    core = [(18, beam_h // 2), (78, 47), (beam_w - 70, 56), (beam_w - 70, beam_h - 56), (78, beam_h - 47)]
+
+    pygame.draw.polygon(beam, (255, 232, 178, int(22 * flicker)), outer)
+    pygame.draw.polygon(beam, (255, 238, 196, int(30 * flicker)), mid)
+    pygame.draw.polygon(beam, (255, 244, 218, int(18 * flicker)), core)
+
+    fog = pygame.Surface((beam_w, beam_h), pygame.SRCALPHA)
+    for index in range(5):
+        glow_w = 44 + index * 26
+        glow_h = 24 + index * 12
+        glow_x = beam_w - 70 - index * 24
+        glow_y = beam_h // 2 - glow_h // 2
+        pygame.draw.ellipse(fog, (255, 242, 212, max(4, 14 - index * 2)), (glow_x, glow_y, glow_w, glow_h))
+    beam.blit(fog, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+
+    dust = pygame.Surface((beam_w, beam_h), pygame.SRCALPHA)
+    for index in range(5):
+        px = 70 + index * 24 + int(5 * math.sin(tick * 0.002 + index))
+        py = 30 + (index * 17) % (beam_h - 60)
+        radius = 1 + (index % 2)
+        pygame.draw.circle(dust, (255, 245, 225, 10), (px, py), radius)
+    beam.blit(dust, (0, 0))
+
+    if facing < 0:
+        beam = pygame.transform.flip(beam, True, False)
+
+    beam_rect = beam.get_rect()
+    beam_rect.midleft = (origin[0] - 8, origin[1]) if facing > 0 else (origin[0] + 8, origin[1])
+    surface.blit(beam, beam_rect.topleft, special_flags=pygame.BLEND_RGBA_ADD)
+
+    glow = pygame.Surface((48, 48), pygame.SRCALPHA)
+    pygame.draw.circle(glow, (255, 223, 150, int(34 * flicker)), (24, 24), 12)
+    pygame.draw.circle(glow, (255, 243, 214, int(46 * flicker)), (24, 24), 5)
+    glow_rect = glow.get_rect(center=origin)
+    surface.blit(glow, glow_rect.topleft, special_flags=pygame.BLEND_RGBA_ADD)
+
+
 def draw_level_background(surface, image, camera_x=0, max_camera=0):
     if image is None:
         return False
@@ -135,7 +283,7 @@ def draw_level_background(surface, image, camera_x=0, max_camera=0):
     return True
 
 
-def load_parallax_layers(prefix, count=7):
+def load_parallax_layers(prefix, count=12):
     layers = []
     for index in range(1, count + 1):
         path = first_existing(
@@ -143,9 +291,32 @@ def load_parallax_layers(prefix, count=7):
             os.path.join(IMAGES_DIR, f"{prefix}_layer_{index}.jpg"),
             os.path.join(IMAGES_DIR, f"{prefix}_layer_{index}_auto.png"),
             os.path.join(IMAGES_DIR, f"{prefix}_layer_{index}_auto.jpg"),
+            os.path.join(ASSETS_DIR, f"{prefix}_layer_{index}.png"),
+            os.path.join(ASSETS_DIR, f"{prefix}_layer_{index}.jpg"),
+            os.path.join(ASSETS_DIR, f"{prefix}_layer_{index}_auto.png"),
+            os.path.join(ASSETS_DIR, f"{prefix}_layer_{index}_auto.jpg"),
         )
         if path:
-            layers.append(trim_transparent_bounds(load_image(path)))
+            # Keep the original canvas size for parallax layers so all exported
+            # pieces preserve their shared alignment when composited together.
+            layers.append(load_image(path))
+    return [layer for layer in layers if layer is not None]
+
+
+def load_numbered_layer_stack(base_name="Layer", start=0, end=9):
+    layers = []
+    for index in range(start, end + 1):
+        path = first_existing(
+            os.path.join(IMAGES_DIR, f"{base_name}_{index}.png"),
+            os.path.join(IMAGES_DIR, f"{base_name}_{index}.jpg"),
+            os.path.join(IMAGES_DIR, f"{base_name}_{index}.jpeg"),
+            os.path.join(IMAGES_DIR, f"{base_name}_0_{index}.png"),
+            os.path.join(IMAGES_DIR, f"{base_name}_0_{index}.jpg"),
+            os.path.join(IMAGES_DIR, f"{base_name}_1_{index}.png"),
+            os.path.join(IMAGES_DIR, f"{base_name}_1_{index}.jpg"),
+        )
+        if path:
+            layers.append(load_image(path))
     return [layer for layer in layers if layer is not None]
 
 
@@ -163,9 +334,9 @@ def draw_parallax_layers(surface, layers, camera_x=0, max_camera=0, overrides=No
         if cached is None:
             image = layer
             image_w, image_h = image.get_size()
-            base_scale = HEIGHT / max(1, image_h)
+            base_scale = min(WIDTH / max(1, image_w), HEIGHT / max(1, image_h))
             image_w = max(1, round(image_w * base_scale))
-            image_h = HEIGHT
+            image_h = max(1, round(image_h * base_scale))
             image = pygame.transform.smoothscale(image, (image_w, image_h))
             if custom_scale != 1.0:
                 image_w = max(1, round(image_w * custom_scale))
@@ -357,10 +528,11 @@ class Player:
                 scaled = flashed
             surface.blit(scaled, (draw_x, draw_y))
             if self.reveal_active:
-                beam = pygame.Surface((150, 120), pygame.SRCALPHA)
-                pygame.draw.ellipse(beam, (255, 245, 183, 60), beam.get_rect())
-                beam_x = draw_x + scaled.get_width() - 4 if self.facing > 0 else draw_x - 106
-                surface.blit(beam, (beam_x, draw_y + 10))
+                beam_origin = (
+                    draw_x + scaled.get_width() - 6 if self.facing > 0 else draw_x + 6,
+                    draw_y + 34,
+                )
+                draw_flashlight_beam(surface, beam_origin, self.facing, True)
             return
 
         x = self.rect.x - camera_x + shake
@@ -381,10 +553,133 @@ class Player:
         pygame.draw.circle(surface, BLACK, (eye_x, y + 16), 2)
 
         if self.reveal_active:
-            beam = pygame.Surface((150, 120), pygame.SRCALPHA)
-            pygame.draw.ellipse(beam, (255, 245, 183, 60), beam.get_rect())
-            beam_x = x + 20 if self.facing > 0 else x - 110
-            surface.blit(beam, (beam_x, y - 8))
+            beam_origin = (x + 28 if self.facing > 0 else x + 6, y + 34)
+            draw_flashlight_beam(surface, beam_origin, self.facing, True)
+
+
+class GnomeSprite:
+    sprites = {"idle": None, "run": []}
+    palette = {
+        "skin": (240, 214, 186),
+        "nose": (224, 176, 144),
+        "beard": (245, 244, 236),
+        "beard_shade": (205, 212, 214),
+        "tunic": (92, 118, 84),
+        "tunic_light": (120, 150, 110),
+        "belt": (96, 61, 32),
+        "boot": (64, 48, 42),
+        "hat": (170, 34, 36),
+        "hat_light": (212, 68, 72),
+        "gold": (233, 193, 94),
+        "outline": (36, 28, 24),
+        "lantern": (244, 213, 120),
+        "glow": (255, 224, 146, 72),
+        "eye": (18, 18, 22),
+    }
+
+    @classmethod
+    def set_sprites(cls, idle_sprite=None, run_sprites=None):
+        run = [trim_transparent_bounds(sprite) for sprite in (run_sprites or []) if sprite is not None]
+        idle = trim_transparent_bounds(idle_sprite)
+        if idle is None and run:
+            idle = run[0]
+        cls.sprites = {
+            "idle": idle,
+            "run": run or cls.generate_default_frames()[1:],
+        }
+        if cls.sprites["idle"] is None:
+            cls.sprites["idle"] = cls.generate_default_frames()[0]
+
+    @classmethod
+    def generate_default_frames(cls):
+        steps = [
+            (2, 0, False),
+            (0, 1, False),
+            (1, 0, False),
+            (2, -1, True),
+            (3, 0, False),
+        ]
+        return [cls.build_frame(step, bob, blink) for step, bob, blink in steps]
+
+    @classmethod
+    def build_frame(cls, step, bob=0, blink=False):
+        colors = cls.palette
+        width, height = 72, 64
+        surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        base_y = 10 + bob
+
+        glow = pygame.Surface((30, 30), pygame.SRCALPHA)
+        pygame.draw.circle(glow, colors["glow"], (15, 15), 15)
+        surface.blit(glow, (40, base_y + 18))
+        pygame.draw.ellipse(surface, (0, 0, 0, 55), (17, 54 + bob, 38, 8))
+
+        pygame.draw.polygon(surface, colors["hat"], [(18, base_y + 12), (31, base_y - 2), (43, base_y + 11), (38, base_y + 16), (23, base_y + 16)])
+        pygame.draw.rect(surface, colors["hat"], (17, base_y + 13, 27, 6), border_radius=3)
+        pygame.draw.rect(surface, colors["hat_light"], (23, base_y + 4, 6, 9), border_radius=2)
+        pygame.draw.circle(surface, colors["gold"], (39, base_y + 8), 3)
+
+        pygame.draw.circle(surface, colors["skin"], (30, base_y + 22), 10)
+        pygame.draw.circle(surface, colors["nose"], (35, base_y + 24), 3)
+        eye_y = base_y + 21
+        if blink:
+            pygame.draw.line(surface, colors["eye"], (26, eye_y), (29, eye_y), 2)
+        else:
+            pygame.draw.circle(surface, colors["eye"], (27, eye_y), 2)
+        pygame.draw.circle(surface, colors["eye"], (32, eye_y + 1), 1)
+
+        pygame.draw.polygon(surface, colors["beard"], [(20, base_y + 25), (40, base_y + 25), (45, base_y + 42), (30, base_y + 52), (15, base_y + 42)])
+        pygame.draw.line(surface, colors["beard_shade"], (30, base_y + 27), (30, base_y + 49), 2)
+        pygame.draw.line(surface, colors["beard_shade"], (25, base_y + 31), (22, base_y + 43), 2)
+        pygame.draw.line(surface, colors["beard_shade"], (35, base_y + 31), (38, base_y + 43), 2)
+
+        pygame.draw.rect(surface, colors["tunic"], (18, base_y + 31, 24, 17), border_radius=6)
+        pygame.draw.rect(surface, colors["tunic_light"], (22, base_y + 34, 16, 6), border_radius=3)
+        pygame.draw.rect(surface, colors["belt"], (19, base_y + 41, 22, 4), border_radius=2)
+        pygame.draw.rect(surface, colors["gold"], (28, base_y + 40, 5, 6), border_radius=2)
+
+        arm_y = base_y + 34 + (1 if step in (1, 2) else 0)
+        pygame.draw.line(surface, colors["skin"], (40, base_y + 35), (48, arm_y + 3), 4)
+        pygame.draw.line(surface, colors["outline"], (49, arm_y + 5), (49, arm_y + 13), 2)
+        pygame.draw.rect(surface, (86, 68, 44), (44, arm_y + 10, 10, 12), border_radius=2)
+        pygame.draw.rect(surface, colors["lantern"], (46, arm_y + 12, 6, 6), border_radius=2)
+
+        arm_offset = -2 if step in (0, 3) else 2
+        pygame.draw.line(surface, colors["tunic_light"], (19, base_y + 35), (13, base_y + 38 + arm_offset), 4)
+
+        leg_specs = [(-4, 4), (4, -4), (2, -2), (-2, 2)]
+        left_dx, right_dx = leg_specs[step % len(leg_specs)]
+        hip_y = base_y + 46
+        pygame.draw.line(surface, colors["boot"], (26, hip_y), (24 + left_dx, base_y + 57), 5)
+        pygame.draw.line(surface, colors["boot"], (34, hip_y), (36 + right_dx, base_y + 57), 5)
+        pygame.draw.line(surface, colors["boot"], (20 + left_dx, base_y + 58), (28 + left_dx, base_y + 58), 4)
+        pygame.draw.line(surface, colors["boot"], (32 + right_dx, base_y + 58), (40 + right_dx, base_y + 58), 4)
+
+        pygame.draw.lines(surface, colors["outline"], False, [(21, base_y + 16), (18, base_y + 13), (31, base_y - 1), (42, base_y + 11)], 1)
+        pygame.draw.arc(surface, colors["outline"], (18, base_y + 12, 24, 20), math.pi, math.tau, 1)
+        pygame.draw.line(surface, colors["outline"], (20, base_y + 25), (16, base_y + 42), 1)
+        pygame.draw.line(surface, colors["outline"], (40, base_y + 25), (44, base_y + 42), 1)
+        pygame.draw.line(surface, colors["outline"], (23, base_y + 31), (23, base_y + 44), 1)
+        pygame.draw.line(surface, colors["outline"], (37, base_y + 31), (37, base_y + 44), 1)
+        return trim_transparent_bounds(surface)
+
+    @classmethod
+    def draw(cls, surface, rect, anim_time=0.0):
+        sprite_pack = cls.sprites
+        run_sprites = sprite_pack["run"]
+        sprite = sprite_pack["idle"]
+        if run_sprites:
+            frame_index = int(anim_time * 11) % len(run_sprites)
+            sprite = run_sprites[frame_index]
+        if sprite:
+            stretch = 1.0 + math.sin(anim_time * 9.5) * 0.05
+            target_box = (82 + int(4 * stretch), 74 + int(10 * stretch))
+            target_size = fit_size(sprite.get_size(), target_box)
+            scaled = pygame.transform.smoothscale(sprite, target_size)
+            draw_x = rect.centerx - scaled.get_width() // 2
+            draw_y = rect.bottom - scaled.get_height() + 2 + int(math.sin(anim_time * 6.2) * 2)
+            surface.blit(scaled, (draw_x, draw_y))
+            return
+        draw_gnome(surface, rect)
 
 
 class ForestLevel:
@@ -415,10 +710,26 @@ class ForestLevel:
         x = self.camera_x + WIDTH + random.randint(80, 280)
         if choice == "gnome":
             rect = pygame.Rect(x, FOREST_GROUND_Y - 52, 44, 42)
-            self.hazards.append({"type": "gnome", "rect": rect, "speed": random.randint(280, 360)})
+            self.hazards.append(
+                {
+                    "type": "gnome",
+                    "rect": rect,
+                    "speed": random.randint(280, 360),
+                    "anim_time": random.random(),
+                    "bob_phase": random.uniform(0.0, math.tau),
+                }
+            )
         else:
             rect = pygame.Rect(x, FOREST_GROUND_Y - 88, 34, 64)
-            self.hazards.append({"type": "rift", "rect": rect, "speed": random.randint(320, 420)})
+            self.hazards.append(
+                {
+                    "type": "rift",
+                    "rect": rect,
+                    "speed": random.randint(320, 420),
+                    "anim_time": random.random(),
+                    "bob_phase": random.uniform(0.0, math.tau),
+                }
+            )
 
     def spawn_page(self):
         x = self.camera_x + WIDTH + random.randint(160, 420)
@@ -475,10 +786,17 @@ class ForestLevel:
             self.spawn_page()
             self.page_timer = random.uniform(0.7, 1.15)
 
+        # Enemy / hazard movement and damage checks for level 1.
         for hazard in list(self.hazards):
             hazard["rect"].x -= int((hazard["speed"] + self.world_speed) * dt)
+            hazard["anim_time"] = hazard.get("anim_time", 0.0) + dt
             if hazard["type"] == "gnome":
-                hazard["rect"].y = FOREST_GROUND_Y - 52 + int(math.sin(pygame.time.get_ticks() * 0.006 + hazard["rect"].x * 0.04) * 8)
+                phase = hazard.get("bob_phase", 0.0)
+                bob = math.sin(hazard["anim_time"] * 12 + phase) * 5
+                hazard["rect"].y = FOREST_GROUND_Y - 52 + int(bob)
+            else:
+                phase = hazard.get("bob_phase", 0.0)
+                hazard["rect"].y = FOREST_GROUND_Y - 88 + int(math.sin(hazard["anim_time"] * 4.8 + phase) * 4)
             if hazard["rect"].right < self.camera_x - 120:
                 self.hazards.remove(hazard)
                 continue
@@ -498,6 +816,7 @@ class ForestLevel:
                 self.particles.append(FloatText(message, player.rect.x - 10, player.rect.y - 20, AMBER))
 
         self.particles = [p for p in self.particles if p.update(dt)]
+        # Level 1 completion condition: collect all required pages.
         if self.collected >= self.target_pages:
             self.done = True
         return "lose" if player.health <= 0 else ("next" if self.done else None)
@@ -515,9 +834,9 @@ class ForestLevel:
         for hazard in self.hazards:
             rect = hazard["rect"].move(-self.camera_x, 0)
             if hazard["type"] == "gnome":
-                draw_gnome(surface, rect)
+                GnomeSprite.draw(surface, rect, hazard.get("anim_time", 0.0))
             else:
-                draw_rift(surface, rect)
+                draw_rift(surface, rect, hazard.get("anim_time", 0.0))
         self.player.draw(surface, self.camera_x)
         draw_hud(surface, fonts, self.player, self.collected, self.target_pages, 1, self.message)
         for particle in self.particles:
@@ -560,8 +879,8 @@ class BunkerLevel:
             pygame.Rect(1760, 370, 120, 20),
         ]
         self.gravity_zones = [
-            pygame.Rect(1110, 120, 380, 420),
-            pygame.Rect(2090, 110, 230, 360),
+            pygame.Rect(1160, 88, 250, 188),
+            pygame.Rect(2140, 96, 120, 168),
         ]
         self.moving_platforms = [{
             "rect": pygame.Rect(1470, 250, 150, 22),
@@ -570,10 +889,10 @@ class BunkerLevel:
             "time": 0.0,
         }]
         self.spikes = [
-            pygame.Rect(520, 504, 90, 16),
-            pygame.Rect(905, 504, 80, 16),
-            pygame.Rect(1640, 504, 120, 16),
-            pygame.Rect(2330, 504, 100, 16),
+            pygame.Rect(515, 504, 90, 16),
+            pygame.Rect(850, 424, 76, 16),
+            pygame.Rect(1705, 464, 108, 16),
+            pygame.Rect(2310, 334, 92, 16),
         ]
         self.ciphers = [
             {"rect": pygame.Rect(845, 388, 54, 52), "solved": False, "hint": "Cipher: TRUST NO GLOW"},
@@ -595,6 +914,7 @@ class BunkerLevel:
         player.update_common(dt)
         player.reveal_active = keys[pygame.K_f] and player.reveal_energy > 0.25
 
+        # Player movement for level 2, including gravity flips and platform collisions.
         in_reverse_zone = any(zone.colliderect(player.rect) for zone in self.gravity_zones)
         self.current_gravity = -1 if in_reverse_zone else 1
 
@@ -648,6 +968,7 @@ class BunkerLevel:
             pos = platform["start"].lerp(platform["end"], blend)
             platform["rect"].topleft = (round(pos.x), round(pos.y))
 
+        # Enemy / hazard interactions for level 2: spikes and puzzle gates.
         for spike in self.spikes:
             if player.rect.colliderect(spike) and player.apply_damage():
                 self.particles.append(FloatText("-1", player.rect.x, player.rect.y - 20, CRIMSON))
@@ -671,6 +992,7 @@ class BunkerLevel:
 
         self.camera_x = clamp(player.rect.centerx - WIDTH // 2, 0, self.length - WIDTH)
         self.particles = [p for p in self.particles if p.update(dt)]
+        # Level 2 completion condition: collect every page and reach the exit side.
         if self.collected >= self.target_pages and player.rect.centerx > 2360:
             self.done = True
         return "lose" if player.health <= 0 else ("next" if self.done else None)
@@ -684,14 +1006,35 @@ class BunkerLevel:
             glow = pygame.Surface(rect.size, pygame.SRCALPHA)
             pygame.draw.rect(glow, (110, 77, 215, 45), glow.get_rect(), border_radius=20)
             surface.blit(glow, rect.topleft)
+        bunker_palette = {
+            "top": (104, 118, 132),
+            "mid": (76, 86, 102),
+            "shadow": (47, 53, 68),
+            "crack": (58, 69, 86),
+            "highlight": (166, 180, 192),
+            "accent": (95, 107, 123),
+        }
         for platform in self.platforms:
-            pygame.draw.rect(surface, STONE, platform.move(-self.camera_x, 0), border_radius=5)
+            draw_stone_surface(surface, platform.move(-self.camera_x, 0), bunker_palette, self.camera_x, border_radius=5)
         for platform in self.moving_platforms:
-            pygame.draw.rect(surface, (96, 119, 148), platform["rect"].move(-self.camera_x, 0), border_radius=5)
+            draw_stone_surface(surface, platform["rect"].move(-self.camera_x, 0), bunker_palette, self.camera_x + 60, border_radius=5)
         for hidden in self.hidden_platforms:
             rect = hidden.move(-self.camera_x, 0)
             if self.player.reveal_active:
-                pygame.draw.rect(surface, (210, 224, 229), rect, border_radius=4)
+                draw_stone_surface(
+                    surface,
+                    rect,
+                    {
+                        "top": (214, 226, 232),
+                        "mid": (185, 202, 210),
+                        "shadow": (137, 155, 170),
+                        "crack": (128, 148, 162),
+                        "highlight": (242, 247, 250),
+                        "accent": (178, 214, 220),
+                    },
+                    self.camera_x,
+                    border_radius=4,
+                )
             else:
                 pygame.draw.rect(surface, (90, 150, 150), rect, 1, border_radius=4)
         for spike in self.spikes:
@@ -784,6 +1127,7 @@ class BossLevel:
         player.update_common(dt)
         player.reveal_active = keys[pygame.K_f] and player.reveal_energy > 0.2
 
+        # Player movement for level 3: arena traversal, jumping, and platform collisions.
         move_x = 0
         if keys[pygame.K_a] or keys[pygame.K_LEFT]:
             move_x -= player.speed
@@ -823,6 +1167,7 @@ class BossLevel:
         if self.boss_fire_timer <= 0 and not self.stan_ready:
             self.spawn_projectile()
             self.boss_fire_timer = 0.95 if self.boss_health > 5 else 0.68
+        # Enemy attack logic for level 3: boss projectiles and weak-point phases.
         for projectile in list(self.projectiles):
             projectile["pos"] += projectile["vel"] * dt
             if projectile["pos"].x < -80 or projectile["pos"].x > WIDTH + 80 or projectile["pos"].y < -80 or projectile["pos"].y > HEIGHT + 80:
@@ -863,6 +1208,7 @@ class BossLevel:
             player.portal_charge = max(0.0, player.portal_charge - dt * 0.75)
 
         self.particles = [p for p in self.particles if p.update(dt)]
+        # Level 3 completion condition: survive, defeat the boss phase, then charge the portal.
         if player.health <= 0:
             return "lose"
         if self.win:
@@ -873,11 +1219,49 @@ class BossLevel:
         boss_bg = backgrounds.get("boss") if backgrounds else None
         if not draw_level_background(surface, boss_bg):
             draw_boss_background(surface, self.distortion)
+        arena_floor = pygame.Rect(0, GROUND_Y, WIDTH, HEIGHT - GROUND_Y)
+        draw_stone_surface(
+            surface,
+            arena_floor,
+            {
+                "top": (89, 77, 72),
+                "mid": (58, 46, 52),
+                "shadow": (28, 21, 29),
+                "crack": (105, 77, 72),
+                "highlight": (141, 117, 108),
+                "accent": (82, 60, 58),
+            },
+            border_radius=0,
+        )
         for platform in self.platforms:
-            pygame.draw.rect(surface, (68, 80, 110), platform, border_radius=6)
+            draw_stone_surface(
+                surface,
+                platform,
+                {
+                    "top": (95, 106, 132),
+                    "mid": (66, 74, 98),
+                    "shadow": (35, 40, 56),
+                    "crack": (114, 126, 154),
+                    "highlight": (163, 175, 201),
+                    "accent": (84, 94, 120),
+                },
+                border_radius=6,
+            )
         for platform in self.hidden_platforms:
             if self.player.reveal_active:
-                pygame.draw.rect(surface, (208, 223, 228), platform, border_radius=6)
+                draw_stone_surface(
+                    surface,
+                    platform,
+                    {
+                        "top": (212, 226, 232),
+                        "mid": (182, 198, 208),
+                        "shadow": (129, 145, 160),
+                        "crack": (126, 148, 168),
+                        "highlight": (242, 246, 249),
+                        "accent": (168, 218, 228),
+                    },
+                    border_radius=6,
+                )
             else:
                 pygame.draw.rect(surface, (91, 145, 152), platform, 1, border_radius=6)
         draw_portal(surface, self.portal_rect, self.player.portal_charge / 3.2)
@@ -920,8 +1304,7 @@ def draw_forest_background(surface, camera_x):
             top = 200 + layer * 30 + (i % 3) * 18
             pygame.draw.polygon(surface, color, [(base_x, HEIGHT), (base_x + 80, top), (base_x + 160, HEIGHT)])
             pygame.draw.rect(surface, color, (base_x + 68, HEIGHT - height_scale, 18, height_scale))
-    pygame.draw.rect(surface, (38, 61, 38), (0, FOREST_GROUND_Y, WIDTH, HEIGHT - FOREST_GROUND_Y))
-    pygame.draw.rect(surface, (53, 72, 43), (0, FOREST_GROUND_Y + 32, WIDTH, 28))
+    draw_forest_ground(surface, FOREST_GROUND_Y, camera_x)
 
 
 def draw_shack(surface, x, y):
@@ -949,12 +1332,19 @@ def draw_gnome(surface, rect):
     pygame.draw.circle(surface, BLACK, (rect.x + 26, rect.y + 18), 2)
 
 
-def draw_rift(surface, rect):
-    glow = pygame.Surface((rect.width + 22, rect.height + 22), pygame.SRCALPHA)
-    pygame.draw.ellipse(glow, (102, 231, 255, 50), glow.get_rect())
-    surface.blit(glow, (rect.x - 11, rect.y - 11))
-    pygame.draw.ellipse(surface, CYAN, rect, 3)
-    pygame.draw.line(surface, WHITE, rect.midtop, rect.midbottom, 2)
+def draw_rift(surface, rect, anim_time=0.0):
+    pulse = 1.0 + math.sin(anim_time * 7.0) * 0.12
+    wobble = int(math.sin(anim_time * 11.0) * 2)
+    glow_pad = 11 + int(5 * pulse)
+    glow = pygame.Surface((rect.width + glow_pad * 2, rect.height + glow_pad * 2), pygame.SRCALPHA)
+    pygame.draw.ellipse(glow, (102, 231, 255, 42 + int(26 * pulse)), glow.get_rect())
+    surface.blit(glow, (rect.x - glow_pad, rect.y - glow_pad))
+
+    active = rect.inflate(int(rect.width * (pulse - 1) * 0.45), int(rect.height * (pulse - 1) * 0.7))
+    active.y += wobble
+    pygame.draw.ellipse(surface, CYAN, active, 3)
+    pygame.draw.line(surface, WHITE, active.midtop, active.midbottom, 2)
+    pygame.draw.line(surface, (180, 247, 255), (active.centerx - 4, active.y + 8), (active.centerx + 5, active.bottom - 10), 1)
 
 
 def draw_bunker_background(surface, camera_x, inverted):
@@ -969,6 +1359,24 @@ def draw_bunker_background(surface, camera_x, inverted):
         pygame.draw.rect(surface, (39, 48, 68), (px, 0, 18, HEIGHT))
     for y in range(120, HEIGHT, 120):
         pygame.draw.line(surface, (54, 63, 88), (0, y), (WIDTH, y), 2)
+
+    # Keep a distant lower-wall base, but place it well below the playable
+    # platform line so it does not read as solid ground across the whole level.
+    floor = pygame.Rect(0, 612, WIDTH, HEIGHT - 612)
+    draw_stone_surface(
+        surface,
+        floor,
+        {
+            "top": (78, 88, 104) if not inverted else (88, 74, 102),
+            "mid": (53, 60, 77),
+            "shadow": (26, 31, 42),
+            "crack": (71, 82, 100),
+            "highlight": (128, 139, 156),
+            "accent": (64, 74, 88),
+        },
+        camera_x,
+        border_radius=0,
+    )
 
 
 def draw_spikes(surface, rect):
@@ -1092,6 +1500,13 @@ class Game:
             "player_idle": first_existing(os.path.join(IMAGES_DIR, "player_idle.png"), os.path.join(IMAGES_DIR, "dipper_idle.png")),
             "player_run_1": first_existing(os.path.join(IMAGES_DIR, "player_run_1.png"), os.path.join(IMAGES_DIR, "dipper_run_1.png"), os.path.join(IMAGES_DIR, "player_run1.png")),
             "player_run_2": first_existing(os.path.join(IMAGES_DIR, "player_run_2.png"), os.path.join(IMAGES_DIR, "dipper_run_2.png"), os.path.join(IMAGES_DIR, "player_run2.png")),
+            "player_run_3": first_existing(os.path.join(IMAGES_DIR, "player_run_3.png"), os.path.join(IMAGES_DIR, "dipper_run_3.png"), os.path.join(IMAGES_DIR, "player_run3.png")),
+            "player_run_4": first_existing(os.path.join(IMAGES_DIR, "player_run_4.png"), os.path.join(IMAGES_DIR, "dipper_run_4.png"), os.path.join(IMAGES_DIR, "player_run4.png")),
+            "gnome_idle": first_existing(os.path.join(IMAGES_DIR, "gnome_idle.png")),
+            "gnome_run_1": first_existing(os.path.join(IMAGES_DIR, "gnome_run_1.png")),
+            "gnome_run_2": first_existing(os.path.join(IMAGES_DIR, "gnome_run_2.png")),
+            "gnome_run_3": first_existing(os.path.join(IMAGES_DIR, "gnome_run_3.png")),
+            "gnome_run_4": first_existing(os.path.join(IMAGES_DIR, "gnome_run_4.png")),
             "music": first_existing(
                 os.path.join(AUDIO_DIR, "menu_music.ogg"),
                 os.path.join(AUDIO_DIR, "menu_music.mp3"),
@@ -1118,6 +1533,7 @@ class Game:
         self.death_timer = 0.0
         self.death_message = ""
         self.menu_buttons = {}
+        self.pause_buttons = {}
         self.volume = 0.42
         self.settings_area = pygame.Rect(620, 135, 435, 458)
         self.volume_slider_rect = pygame.Rect(0, 0, 300, 12)
@@ -1125,6 +1541,7 @@ class Game:
         self.fullscreen = False
         self.difficulty_options = ["Easy", "Normal", "Hard"]
         self.difficulty_index = 1
+        self.settings_return_state = "menu"
         self.settings_buttons = {
             "music": pygame.Rect(0, 0, 360, 46),
             "fullscreen": pygame.Rect(0, 0, 360, 46),
@@ -1140,13 +1557,24 @@ class Game:
             "forest": load_image(self.asset_paths["forest_background"]),
             "bunker": load_image(self.asset_paths["bunker_background"]),
             "boss": load_image(self.asset_paths["boss_background"]),
-            "forest_layers": load_parallax_layers("forest"),
+            "forest_layers": load_parallax_layers("forest", 12),
         }
         Player.set_sprites(
             load_image(self.asset_paths["player_idle"]),
             [
                 load_image(self.asset_paths["player_run_1"]),
                 load_image(self.asset_paths["player_run_2"]),
+                load_image(self.asset_paths["player_run_3"]),
+                load_image(self.asset_paths["player_run_4"]),
+            ],
+        )
+        GnomeSprite.set_sprites(
+            load_image(self.asset_paths["gnome_idle"]),
+            [
+                load_image(self.asset_paths["gnome_run_1"]),
+                load_image(self.asset_paths["gnome_run_2"]),
+                load_image(self.asset_paths["gnome_run_3"]),
+                load_image(self.asset_paths["gnome_run_4"]),
             ],
         )
         self.button_images = {
@@ -1358,6 +1786,7 @@ class Game:
         self.banner_timer = 4.0
         self.death_timer = 0.0
         self.death_message = ""
+        self.settings_return_state = "menu"
         self.apply_difficulty()
         if clear_save:
             self.clear_progress()
@@ -1372,6 +1801,35 @@ class Game:
         self.state = "playing"
         self.overlay_text = f"Level {self.level_index + 1}"
         self.banner_timer = 2.2
+
+    def start_new_game(self):
+        self.levels = self.build_levels()
+        self.level_index = 0
+        self.apply_difficulty()
+        self.clear_progress()
+        self.state = "playing"
+        self.overlay_text = "Level 1"
+        self.banner_timer = 3.0
+        self.death_timer = 0.0
+        self.death_message = ""
+        self.settings_return_state = "menu"
+
+    def continue_game(self):
+        self.level_index = self.load_progress()
+        self.levels = self.build_levels()
+        self.apply_difficulty()
+        self.state = "playing"
+        self.overlay_text = f"Level {self.level_index + 1}"
+        self.banner_timer = 3.0
+        self.death_timer = 0.0
+        self.death_message = ""
+        self.settings_return_state = "menu"
+
+    def toggle_pause(self):
+        if self.state == "playing":
+            self.state = "paused"
+        elif self.state == "paused":
+            self.state = "playing"
 
     def draw_death_notice(self):
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -1390,7 +1848,7 @@ class Game:
         if self.button_images["idle"]:
             ratio = self.button_images["idle"].get_width() / max(1, self.button_images["idle"].get_height())
             max_label_width = 0
-            for label in ("Play", "Settings", "Exit"):
+            for label in ("Continue", "Play", "Settings", "Exit", "Main Menu"):
                 max_label_width = max(max_label_width, self.fonts["small"].size(label)[0])
             target_width = max(314, int((max_label_width + 120) * 1.12))
             target_width = int(clamp(target_width, 314, 515))
@@ -1398,8 +1856,33 @@ class Game:
             return target_width, int(clamp(target_height, 100, 162))
         return 336, 76
 
-    def get_button_surface_and_rect(self, key, hovered):
-        button = self.menu_buttons[key]
+    def build_vertical_button_layout(self, labels, area):
+        button_w, button_h = self.get_menu_button_size()
+        gap = 16 if self.button_images["idle"] else 12
+        available_height = area.height
+        available_width = area.width
+        visual_bounds = self.get_button_visual_bounds((button_w, button_h))
+        visible_step = visual_bounds.height + gap
+        total_height = visual_bounds.top + visual_bounds.height * len(labels) + gap * max(0, len(labels) - 1) + (button_h - visual_bounds.bottom)
+        if total_height > available_height:
+            button_h = max(72, (available_height - gap * max(0, len(labels) - 1)) // max(1, len(labels)))
+            if self.button_images["idle"]:
+                ratio = self.button_images["idle"].get_width() / max(1, self.button_images["idle"].get_height())
+                button_w = int(clamp(button_h * ratio, 240, min(460, available_width)))
+            visual_bounds = self.get_button_visual_bounds((button_w, button_h))
+            visible_step = visual_bounds.height + gap
+            total_height = visual_bounds.top + visual_bounds.height * len(labels) + gap * max(0, len(labels) - 1) + (button_h - visual_bounds.bottom)
+        button_w = min(button_w, available_width)
+        start_x = area.x + max(0, (available_width - button_w) // 2)
+        start_y = area.y + max(0, (available_height - total_height) // 2)
+        buttons = {}
+        for index, (key, label) in enumerate(labels):
+            rect = pygame.Rect(start_x, start_y + index * visible_step, button_w, button_h)
+            buttons[key] = {"rect": rect, "label": label}
+        return buttons
+
+    def get_button_surface_and_rect(self, key, hovered, state="menu"):
+        button = self.get_button_collection(state)[key]
         source = self.button_images["hover"] if hovered else self.button_images["idle"]
         if not source:
             return None, button["rect"]
@@ -1417,10 +1900,10 @@ class Game:
             return pygame.Rect(0, 0, size[0], size[1])
         return bounds
 
-    def is_point_on_button_texture(self, key, point):
+    def is_point_on_button_texture(self, key, point, state="menu"):
         if not self.button_images["idle"]:
-            return self.menu_buttons[key]["rect"].collidepoint(point)
-        surface, rect = self.get_button_surface_and_rect(key, False)
+            return self.get_button_collection(state)[key]["rect"].collidepoint(point)
+        surface, rect = self.get_button_surface_and_rect(key, False, state)
         if not surface or not rect.collidepoint(point):
             return False
         local_x = point[0] - rect.x
@@ -1556,42 +2039,27 @@ class Game:
 
     # --- MENU BUTTONS ---
     def build_menu_buttons(self):
-        button_w, button_h = self.get_menu_button_size()
-        gap = 16 if self.button_images["idle"] else 12
-        menu_left = 655
-        menu_right = 1105
-        menu_top = 95
-        menu_bottom = 645
-        available_height = menu_bottom - menu_top
-        available_width = menu_right - menu_left
-        visual_bounds = self.get_button_visual_bounds((button_w, button_h))
-        visible_step = visual_bounds.height + gap
-        total_height = visual_bounds.top + visual_bounds.height * 3 + gap * 2 + (button_h - visual_bounds.bottom)
-        if total_height > available_height:
-            button_h = max(72, (available_height - gap * 2) // 3)
-            if self.button_images["idle"]:
-                ratio = self.button_images["idle"].get_width() / max(1, self.button_images["idle"].get_height())
-                button_w = int(clamp(button_h * ratio, 240, min(460, available_width)))
-            visual_bounds = self.get_button_visual_bounds((button_w, button_h))
-            visible_step = visual_bounds.height + gap
-            total_height = visual_bounds.top + visual_bounds.height * 3 + gap * 2 + (button_h - visual_bounds.bottom)
-        button_w = min(button_w, available_width)
-        start_x = menu_left + max(0, (available_width - button_w) // 2)
-        start_y = menu_top + max(0, (available_height - total_height) // 2)
-        labels = [("play", "Play"), ("settings", "Settings"), ("exit", "Exit")]
-        buttons = {}
-        for index, (key, label) in enumerate(labels):
-            rect = pygame.Rect(start_x, start_y + index * visible_step, button_w, button_h)
-            buttons[key] = {"rect": rect, "label": label}
-        self.menu_buttons = buttons
-        return buttons
+        labels = [("play", "Play"), ("continue", "Continue"), ("settings", "Settings"), ("exit", "Exit")]
+        area = pygame.Rect(655, 95, 450, 550)
+        self.menu_buttons = self.build_vertical_button_layout(labels, area)
+        return self.menu_buttons
 
-    def draw_menu_button(self, key, mouse_pos):
-        button = self.menu_buttons[key]
+    def build_pause_buttons(self):
+        labels = [("continue", "Continue"), ("settings", "Settings"), ("main_menu", "Main Menu")]
+        area = pygame.Rect(WIDTH // 2 - 230, 240, 460, 320)
+        self.pause_buttons = self.build_vertical_button_layout(labels, area)
+        return self.pause_buttons
+
+    def get_button_collection(self, state):
+        return self.pause_buttons if state == "paused" else self.menu_buttons
+
+    def draw_menu_button(self, key, mouse_pos, state="menu"):
+        buttons = self.get_button_collection(state)
+        button = buttons[key]
         rect = button["rect"]
-        hovered = self.is_point_on_button_texture(key, mouse_pos)
+        hovered = self.is_point_on_button_texture(key, mouse_pos, state)
         if self.button_images["idle"]:
-            scaled, draw_rect = self.get_button_surface_and_rect(key, hovered)
+            scaled, draw_rect = self.get_button_surface_and_rect(key, hovered, state)
             self.screen.blit(scaled, draw_rect.topleft)
             bounds = scaled.get_bounding_rect(min_alpha=20)
             center_x = rect.x + bounds.centerx
@@ -1628,8 +2096,24 @@ class Game:
             draw_forest_background(self.screen, 0)
         mouse_pos = pygame.mouse.get_pos()
         self.build_menu_buttons()
-        for key in ("play", "settings", "exit"):
+        for key in ("play", "continue", "settings", "exit"):
             self.draw_menu_button(key, mouse_pos)
+
+    def draw_pause_menu(self):
+        self.current_level.draw(self.screen, self.fonts, self.level_backgrounds)
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((8, 10, 18, 178))
+        self.screen.blit(overlay, (0, 0))
+
+        title = self.fonts["title"].render("Paused", True, WHITE)
+        subtitle = self.fonts["small"].render("Esc to continue", True, PAPER)
+        self.screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 150))
+        self.screen.blit(subtitle, (WIDTH // 2 - subtitle.get_width() // 2, 208))
+
+        mouse_pos = pygame.mouse.get_pos()
+        self.build_pause_buttons()
+        for key in ("continue", "settings", "main_menu"):
+            self.draw_menu_button(key, mouse_pos, state="paused")
 
     # --- SETTINGS ---
     def draw_settings(self):
@@ -1669,14 +2153,30 @@ class Game:
             right_text = self.fonts["small"].render(">", True, WHITE)
             self.screen.blit(right_text, (diff_right.centerx - right_text.get_width() // 2, diff_right.centery - right_text.get_height() // 2))
 
-    def handle_menu_click(self, mouse_pos):
-        if not self.menu_buttons:
-            self.build_menu_buttons()
-        for key, button in self.menu_buttons.items():
-            if self.is_point_on_button_texture(key, mouse_pos):
-                if key == "play":
-                    self.state = "playing"
+    def handle_menu_click(self, mouse_pos, state="menu"):
+        buttons = self.get_button_collection(state)
+        if not buttons:
+            if state == "paused":
+                buttons = self.build_pause_buttons()
+            else:
+                buttons = self.build_menu_buttons()
+        for key in buttons:
+            if self.is_point_on_button_texture(key, mouse_pos, state):
+                if state == "paused":
+                    if key == "continue":
+                        self.state = "playing"
+                    elif key == "settings":
+                        self.settings_return_state = "paused"
+                        self.state = "settings"
+                    elif key == "main_menu":
+                        self.state = "menu"
+                    break
+                if key == "continue":
+                    self.continue_game()
+                elif key == "play":
+                    self.start_new_game()
                 elif key == "settings":
+                    self.settings_return_state = "menu"
                     self.state = "settings"
                 elif key == "exit":
                     return False
@@ -1791,6 +2291,9 @@ class Game:
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.state == "menu":
                         running = self.handle_menu_click(event.pos)
+                    elif self.state == "paused":
+                        self.handle_settings_mouse_up()
+                        running = self.handle_menu_click(event.pos, state="paused")
                     elif self.state == "settings":
                         self.handle_settings_mouse_down(event.pos)
                 elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
@@ -1803,7 +2306,11 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         if self.state == "settings":
                             self.dragging_volume = False
-                            self.state = "menu"
+                            self.state = self.settings_return_state
+                        elif self.state in ("playing", "paused"):
+                            self.toggle_pause()
+                        elif self.state == "menu":
+                            running = False
                         else:
                             running = False
                     elif self.state == "menu" and event.key in (pygame.K_RETURN, pygame.K_SPACE):
@@ -1814,6 +2321,8 @@ class Game:
                 self.draw_menu()
             elif self.state == "settings":
                 self.draw_settings()
+            elif self.state == "paused":
+                self.draw_pause_menu()
             elif self.state == "playing":
                 self.banner_timer = max(0.0, self.banner_timer - dt)
                 result = self.current_level.update(dt, keys)
