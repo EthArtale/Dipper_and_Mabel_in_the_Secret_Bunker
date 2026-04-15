@@ -58,6 +58,11 @@ def clamp(value, low, high):
     return max(low, min(high, value))
 
 
+def is_flashlight_pressed(keys):
+    mouse_buttons = pygame.mouse.get_pressed(3)
+    return keys[pygame.K_f] or mouse_buttons[0]
+
+
 def ease(value):
     value = clamp(value, 0.0, 1.0)
     return value * value * (3 - 2 * value)
@@ -743,7 +748,7 @@ class ForestLevel:
         moving = keys[pygame.K_d] or keys[pygame.K_RIGHT]
         retreat = keys[pygame.K_a] or keys[pygame.K_LEFT]
         player.set_motion_state(moving or retreat, dt)
-        player.reveal_active = keys[pygame.K_f] and player.reveal_energy > 0.2
+        player.reveal_active = is_flashlight_pressed(keys) and player.reveal_energy > 0.2
         screen_x = player.rect.x - self.camera_x
 
         if moving:
@@ -864,46 +869,48 @@ class BunkerLevel:
         self.message = "Level 2: Use the diary lens to reveal hidden paths, dodge traps, solve ciphers."
         self.particles = []
         self.platforms = [
-            pygame.Rect(0, 520, 420, 200),
-            pygame.Rect(470, 480, 180, 24),
-            pygame.Rect(780, 440, 180, 24),
-            pygame.Rect(1070, 390, 170, 24),
-            pygame.Rect(1370, 330, 180, 24),
-            pygame.Rect(1620, 480, 320, 24),
-            pygame.Rect(1970, 420, 170, 24),
-            pygame.Rect(2250, 350, 220, 24),
+            pygame.Rect(0, 520, 380, 200),
+            pygame.Rect(440, 500, 220, 24),
+            pygame.Rect(730, 450, 220, 24),
+            pygame.Rect(1020, 405, 220, 24),
+            pygame.Rect(1290, 340, 210, 24),
+            pygame.Rect(1560, 285, 180, 24),
+            pygame.Rect(1830, 340, 220, 24),
+            pygame.Rect(2085, 410, 210, 24),
+            pygame.Rect(2330, 350, 190, 24),
         ]
         self.hidden_platforms = [
-            pygame.Rect(610, 365, 120, 20),
-            pygame.Rect(1235, 255, 110, 20),
-            pygame.Rect(1760, 370, 120, 20),
+            pygame.Rect(905, 395, 90, 20),
+            pygame.Rect(1485, 230, 110, 20),
+            pygame.Rect(1680, 255, 120, 20),
+            pygame.Rect(2235, 285, 110, 20),
         ]
         self.gravity_zones = [
-            pygame.Rect(1160, 88, 250, 188),
-            pygame.Rect(2140, 96, 120, 168),
+            pygame.Rect(1420, 78, 260, 190),
+            pygame.Rect(2215, 86, 150, 170),
         ]
         self.moving_platforms = [{
-            "rect": pygame.Rect(1470, 250, 150, 22),
-            "start": pygame.Vector2(1470, 250),
-            "end": pygame.Vector2(1720, 170),
+            "rect": pygame.Rect(1600, 240, 140, 22),
+            "start": pygame.Vector2(1600, 240),
+            "end": pygame.Vector2(1760, 205),
             "time": 0.0,
         }]
         self.spikes = [
-            pygame.Rect(515, 504, 90, 16),
-            pygame.Rect(850, 424, 76, 16),
-            pygame.Rect(1705, 464, 108, 16),
-            pygame.Rect(2310, 334, 92, 16),
+            pygame.Rect(555, 484, 62, 16),
+            pygame.Rect(846, 434, 70, 16),
+            pygame.Rect(1368, 324, 74, 16),
+            pygame.Rect(2142, 394, 72, 16),
         ]
         self.ciphers = [
-            {"rect": pygame.Rect(845, 388, 54, 52), "solved": False, "hint": "Cipher: TRUST NO GLOW"},
-            {"rect": pygame.Rect(1840, 448, 54, 52), "solved": False, "hint": "Cipher: LIGHT SHOWS STAIRS"},
+            {"id": "glow", "rect": pygame.Rect(1072, 353, 54, 52), "solved": False, "hint": "Cipher: TRUST NO GLOW"},
+            {"id": "stairs", "rect": pygame.Rect(1872, 288, 54, 52), "solved": False, "hint": "Cipher: LIGHT SHOWS STAIRS"},
         ]
         self.pages = [
-            {"rect": pygame.Rect(1095, 338, 26, 32), "hidden": False, "taken": False},
-            {"rect": pygame.Rect(1275, 205, 26, 32), "hidden": True, "taken": False},
-            {"rect": pygame.Rect(1705, 445, 26, 32), "hidden": False, "taken": False},
-            {"rect": pygame.Rect(1795, 320, 26, 32), "hidden": True, "taken": False},
-            {"rect": pygame.Rect(2365, 300, 26, 32), "hidden": False, "taken": False},
+            {"rect": pygame.Rect(790, 398, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(1178, 353, 26, 32), "hidden": False, "taken": False, "lock": "glow"},
+            {"rect": pygame.Rect(1716, 206, 26, 32), "hidden": True, "taken": False, "lock": None},
+            {"rect": pygame.Rect(1888, 288, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(2394, 302, 26, 32), "hidden": False, "taken": False, "lock": "stairs"},
         ]
 
     def active_platforms(self):
@@ -912,7 +919,7 @@ class BunkerLevel:
     def update(self, dt, keys):
         player = self.player
         player.update_common(dt)
-        player.reveal_active = keys[pygame.K_f] and player.reveal_energy > 0.25
+        player.reveal_active = is_flashlight_pressed(keys) and player.reveal_energy > 0.25
 
         # Player movement for level 2, including gravity flips and platform collisions.
         in_reverse_zone = any(zone.colliderect(player.rect) for zone in self.gravity_zones)
@@ -932,6 +939,12 @@ class BunkerLevel:
         if grounded and (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]):
             player.vel.y = player.jump_strength * self.current_gravity
             player.on_ground = False
+
+        for platform in self.moving_platforms:
+            platform["time"] += dt
+            blend = (math.sin(platform["time"] * 1.4) + 1) / 2
+            pos = platform["start"].lerp(platform["end"], blend)
+            platform["rect"].topleft = (round(pos.x), round(pos.y))
 
         previous = player.rect.copy()
         player.rect.x += int(move_x * dt)
@@ -962,12 +975,6 @@ class BunkerLevel:
         if player.rect.top > HEIGHT + 180 or player.rect.bottom < -180:
             player.health = 0
 
-        for platform in self.moving_platforms:
-            platform["time"] += dt
-            blend = (math.sin(platform["time"] * 1.4) + 1) / 2
-            pos = platform["start"].lerp(platform["end"], blend)
-            platform["rect"].topleft = (round(pos.x), round(pos.y))
-
         # Enemy / hazard interactions for level 2: spikes and puzzle gates.
         for spike in self.spikes:
             if player.rect.colliderect(spike) and player.apply_damage():
@@ -983,9 +990,9 @@ class BunkerLevel:
             if page["taken"]:
                 continue
             visible = (not page["hidden"]) or player.reveal_active
-            behind_cipher = page["rect"].x > 850 and page["rect"].x < 940 and not self.ciphers[0]["solved"]
-            behind_cipher = behind_cipher or (page["rect"].x > 1750 and page["rect"].x < 1880 and not self.ciphers[1]["solved"])
-            if visible and not behind_cipher and player.rect.colliderect(page["rect"]):
+            required_cipher = page.get("lock")
+            locked = required_cipher and not any(cipher["id"] == required_cipher and cipher["solved"] for cipher in self.ciphers)
+            if visible and not locked and player.rect.colliderect(page["rect"]):
                 page["taken"] = True
                 self.collected += 1
                 self.particles.append(FloatText("Decoded page", page["rect"].x, page["rect"].y - 24, AMBER))
@@ -1067,25 +1074,31 @@ class BunkerLevel:
 
 class BossLevel:
     def __init__(self):
+        self.length = 2200
         self.reset()
 
     def reset(self):
         self.player = Player()
-        self.player.reset_position(120, GROUND_Y - 78)
+        self.player.reset_position(90, GROUND_Y - 78)
         self.player.health = 6
         self.player.max_health = 6
         self.message = "Level 3: Survive Bill's shadow, reveal weak points, then charge the portal with Stan."
+        self.camera_x = 0
         self.particles = []
         self.platforms = [
-            pygame.Rect(250, 460, 180, 24),
-            pygame.Rect(520, 360, 170, 24),
-            pygame.Rect(850, 450, 180, 24),
+            pygame.Rect(220, 500, 210, 24),
+            pygame.Rect(500, 415, 170, 24),
+            pygame.Rect(860, 360, 170, 24),
+            pygame.Rect(1170, 360, 170, 24),
+            pygame.Rect(1530, 415, 170, 24),
+            pygame.Rect(1830, 500, 210, 24),
         ]
         self.hidden_platforms = [
-            pygame.Rect(690, 280, 120, 20),
-            pygame.Rect(1020, 300, 120, 20),
+            pygame.Rect(670, 300, 130, 20),
+            pygame.Rect(1035, 95, 130, 20),
+            pygame.Rect(1370, 300, 130, 20),
         ]
-        self.boss_rect = pygame.Rect(920, 140, 160, 190)
+        self.boss_rect = pygame.Rect(self.length // 2 - 80, 145, 160, 190)
         self.boss_health = 12
         self.boss_fire_timer = 1.1
         self.distortion = 0.0
@@ -1093,8 +1106,8 @@ class BossLevel:
         self.weak_points = []
         self.weak_timer = 2.8
         self.stan_ready = False
-        self.stan_rect = pygame.Rect(1090, GROUND_Y - 82, 46, 82)
-        self.portal_rect = pygame.Rect(1120, 430, 88, 170)
+        self.stan_rect = pygame.Rect(self.length - 230, GROUND_Y - 82, 46, 82)
+        self.portal_rect = pygame.Rect(self.length - 180, 420, 88, 180)
         self.win = False
 
     def spawn_projectile(self):
@@ -1111,11 +1124,11 @@ class BossLevel:
         if len(self.weak_points) >= 2:
             return
         pool = [
-            pygame.Rect(620, 210, 34, 34),
-            pygame.Rect(760, 200, 34, 34),
-            pygame.Rect(870, 280, 34, 34),
-            pygame.Rect(1030, 215, 34, 34),
-            pygame.Rect(760, 420, 34, 34),
+            pygame.Rect(self.boss_rect.left - 270, 400, 34, 34),
+            pygame.Rect(self.boss_rect.left - 105, 250, 34, 34),
+            pygame.Rect(self.boss_rect.centerx - 17, 210, 34, 34),
+            pygame.Rect(self.boss_rect.right + 70, 250, 34, 34),
+            pygame.Rect(self.boss_rect.right + 230, 400, 34, 34),
         ]
         rect = random.choice(pool).copy()
         if any(item["rect"].colliderect(rect) for item in self.weak_points):
@@ -1125,7 +1138,7 @@ class BossLevel:
     def update(self, dt, keys):
         player = self.player
         player.update_common(dt)
-        player.reveal_active = keys[pygame.K_f] and player.reveal_energy > 0.2
+        player.reveal_active = is_flashlight_pressed(keys) and player.reveal_energy > 0.2
 
         # Player movement for level 3: arena traversal, jumping, and platform collisions.
         move_x = 0
@@ -1142,7 +1155,7 @@ class BossLevel:
 
         previous = player.rect.copy()
         player.rect.x += int(move_x * dt)
-        player.rect.x = clamp(player.rect.x, 20, WIDTH - player.rect.width - 20)
+        player.rect.x = clamp(player.rect.x, 20, self.length - player.rect.width - 20)
 
         collision_platforms = list(self.platforms)
         if player.reveal_active:
@@ -1157,11 +1170,13 @@ class BossLevel:
         player.vel.y += 1650 * dt
         player.rect.y += int(player.vel.y * dt)
         player.on_ground = False
-        for platform in collision_platforms + [pygame.Rect(0, GROUND_Y, WIDTH, 120)]:
+        for platform in collision_platforms + [pygame.Rect(0, GROUND_Y, self.length, 120)]:
             if player.rect.colliderect(platform) and previous.bottom <= platform.top and player.vel.y >= 0:
                 player.rect.bottom = platform.top
                 player.vel.y = 0
                 player.on_ground = True
+
+        self.camera_x = clamp(player.rect.centerx - WIDTH // 2, 0, self.length - WIDTH)
 
         self.boss_fire_timer -= dt
         if self.boss_fire_timer <= 0 and not self.stan_ready:
@@ -1170,7 +1185,7 @@ class BossLevel:
         # Enemy attack logic for level 3: boss projectiles and weak-point phases.
         for projectile in list(self.projectiles):
             projectile["pos"] += projectile["vel"] * dt
-            if projectile["pos"].x < -80 or projectile["pos"].x > WIDTH + 80 or projectile["pos"].y < -80 or projectile["pos"].y > HEIGHT + 80:
+            if projectile["pos"].x < -80 or projectile["pos"].x > self.length + 80 or projectile["pos"].y < -80 or projectile["pos"].y > HEIGHT + 80:
                 self.projectiles.remove(projectile)
                 continue
             rect = pygame.Rect(projectile["pos"].x - projectile["radius"], projectile["pos"].y - projectile["radius"], projectile["radius"] * 2, projectile["radius"] * 2)
@@ -1217,9 +1232,9 @@ class BossLevel:
 
     def draw(self, surface, fonts, backgrounds=None):
         boss_bg = backgrounds.get("boss") if backgrounds else None
-        if not draw_level_background(surface, boss_bg):
+        if not draw_level_background(surface, boss_bg, self.camera_x, self.length - WIDTH):
             draw_boss_background(surface, self.distortion)
-        arena_floor = pygame.Rect(0, GROUND_Y, WIDTH, HEIGHT - GROUND_Y)
+        arena_floor = pygame.Rect(-self.camera_x, GROUND_Y, self.length, HEIGHT - GROUND_Y)
         draw_stone_surface(
             surface,
             arena_floor,
@@ -1231,12 +1246,13 @@ class BossLevel:
                 "highlight": (141, 117, 108),
                 "accent": (82, 60, 58),
             },
+            self.camera_x,
             border_radius=0,
         )
         for platform in self.platforms:
             draw_stone_surface(
                 surface,
-                platform,
+                platform.move(-self.camera_x, 0),
                 {
                     "top": (95, 106, 132),
                     "mid": (66, 74, 98),
@@ -1245,13 +1261,15 @@ class BossLevel:
                     "highlight": (163, 175, 201),
                     "accent": (84, 94, 120),
                 },
+                self.camera_x,
                 border_radius=6,
             )
         for platform in self.hidden_platforms:
+            rect = platform.move(-self.camera_x, 0)
             if self.player.reveal_active:
                 draw_stone_surface(
                     surface,
-                    platform,
+                    rect,
                     {
                         "top": (212, 226, 232),
                         "mid": (182, 198, 208),
@@ -1260,23 +1278,26 @@ class BossLevel:
                         "highlight": (242, 246, 249),
                         "accent": (168, 218, 228),
                     },
+                    self.camera_x,
                     border_radius=6,
                 )
             else:
-                pygame.draw.rect(surface, (91, 145, 152), platform, 1, border_radius=6)
-        draw_portal(surface, self.portal_rect, self.player.portal_charge / 3.2)
+                pygame.draw.rect(surface, (91, 145, 152), rect, 1, border_radius=6)
+        draw_portal(surface, self.portal_rect.move(-self.camera_x, 0), self.player.portal_charge / 3.2)
         if not self.stan_ready:
-            draw_bill_shadow(surface, self.boss_rect, self.boss_health)
+            draw_bill_shadow(surface, self.boss_rect.move(-self.camera_x, 0), self.boss_health)
         else:
-            draw_stan(surface, self.stan_rect)
+            draw_stan(surface, self.stan_rect.move(-self.camera_x, 0))
         for projectile in self.projectiles:
-            pygame.draw.circle(surface, (114, 245, 255), projectile["pos"], projectile["radius"])
-            pygame.draw.circle(surface, WHITE, projectile["pos"], max(5, projectile["radius"] // 2))
+            center = (round(projectile["pos"].x - self.camera_x), round(projectile["pos"].y))
+            pygame.draw.circle(surface, (114, 245, 255), center, projectile["radius"])
+            pygame.draw.circle(surface, WHITE, center, max(5, projectile["radius"] // 2))
         for point in self.weak_points:
             color = CYAN if self.player.reveal_active else (71, 103, 111)
-            pygame.draw.circle(surface, color, point["rect"].center, 18, 3)
-            pygame.draw.circle(surface, color, point["rect"].center, 6)
-        self.player.draw(surface)
+            center = (point["rect"].centerx - self.camera_x, point["rect"].centery)
+            pygame.draw.circle(surface, color, center, 18, 3)
+            pygame.draw.circle(surface, color, center, 6)
+        self.player.draw(surface, self.camera_x)
         draw_hud(surface, fonts, self.player, max(0, 12 - self.boss_health), 12, 3, self.message)
         boss_text = fonts["small"].render(f"Bill's shadow: {max(0, self.boss_health)}/12", True, WHITE)
         surface.blit(boss_text, (WIDTH - 240, 88))
@@ -1287,7 +1308,7 @@ class BossLevel:
             alpha = int(255 * clamp(particle.life / 1.4, 0, 1))
             text = fonts["small"].render(particle.text, True, particle.color)
             text.set_alpha(alpha)
-            surface.blit(text, (particle.x, particle.y))
+            surface.blit(text, (particle.x - self.camera_x, particle.y))
 
 
 def draw_forest_background(surface, camera_x):
