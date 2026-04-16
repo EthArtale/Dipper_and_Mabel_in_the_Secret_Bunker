@@ -519,7 +519,7 @@ class Player:
         run_sprites = sprite_pack["run"]
         sprite = sprite_pack["idle"]
         if self.is_moving and run_sprites:
-            frame_index = int(self.run_anim_time * 10) % len(run_sprites)
+            frame_index = int(self.run_anim_time * 1.4) % len(run_sprites)
             sprite = run_sprites[frame_index]
         if sprite:
             draw_sprite = pygame.transform.flip(sprite, self.facing < 0, False)
@@ -673,7 +673,7 @@ class GnomeSprite:
         run_sprites = sprite_pack["run"]
         sprite = sprite_pack["idle"]
         if run_sprites:
-            frame_index = int(anim_time * 11) % len(run_sprites)
+            frame_index = int(anim_time * 1.8) % len(run_sprites)
             sprite = run_sprites[frame_index]
         if sprite:
             stretch = 1.0 + math.sin(anim_time * 9.5) * 0.05
@@ -1073,6 +1073,12 @@ class BunkerLevel:
 
 
 class BossLevel:
+    sprite = None
+
+    @classmethod
+    def set_sprite(cls, sprite):
+        cls.sprite = trim_transparent_bounds(sprite)
+
     def __init__(self):
         self.length = 2200
         self.reset()
@@ -1285,7 +1291,19 @@ class BossLevel:
                 pygame.draw.rect(surface, (91, 145, 152), rect, 1, border_radius=6)
         draw_portal(surface, self.portal_rect.move(-self.camera_x, 0), self.player.portal_charge / 3.2)
         if not self.stan_ready:
-            draw_bill_shadow(surface, self.boss_rect.move(-self.camera_x, 0), self.boss_health)
+            boss_rect = self.boss_rect.move(-self.camera_x, 0)
+            if BossLevel.sprite:
+                target_size = fit_size(BossLevel.sprite.get_size(), (boss_rect.width + 90, boss_rect.height + 90))
+                scaled = pygame.transform.smoothscale(BossLevel.sprite, target_size)
+                draw_rect = scaled.get_rect(center=boss_rect.center)
+                pulse = 0.92 + 0.08 * math.sin(pygame.time.get_ticks() * 0.0013)
+                if pulse != 1.0:
+                    tinted = scaled.copy()
+                    tinted.fill((int(20 * pulse), int(40 * pulse), int(75 * pulse), 0), special_flags=pygame.BLEND_RGBA_ADD)
+                    scaled = tinted
+                surface.blit(scaled, draw_rect.topleft)
+            else:
+                draw_bill_shadow(surface, boss_rect, self.boss_health)
         else:
             draw_stan(surface, self.stan_rect.move(-self.camera_x, 0))
         for projectile in self.projectiles:
@@ -1523,6 +1541,7 @@ class Game:
             "player_run_2": first_existing(os.path.join(IMAGES_DIR, "player_run_2.png"), os.path.join(IMAGES_DIR, "dipper_run_2.png"), os.path.join(IMAGES_DIR, "player_run2.png")),
             "player_run_3": first_existing(os.path.join(IMAGES_DIR, "player_run_3.png"), os.path.join(IMAGES_DIR, "dipper_run_3.png"), os.path.join(IMAGES_DIR, "player_run3.png")),
             "player_run_4": first_existing(os.path.join(IMAGES_DIR, "player_run_4.png"), os.path.join(IMAGES_DIR, "dipper_run_4.png"), os.path.join(IMAGES_DIR, "player_run4.png")),
+            "boss_idle": first_existing(os.path.join(IMAGES_DIR, "boss_idle.png")),
             "gnome_idle": first_existing(os.path.join(IMAGES_DIR, "gnome_idle.png")),
             "gnome_run_1": first_existing(os.path.join(IMAGES_DIR, "gnome_run_1.png")),
             "gnome_run_2": first_existing(os.path.join(IMAGES_DIR, "gnome_run_2.png")),
@@ -1589,6 +1608,7 @@ class Game:
                 load_image(self.asset_paths["player_run_4"]),
             ],
         )
+        BossLevel.set_sprite(load_image(self.asset_paths["boss_idle"]))
         GnomeSprite.set_sprites(
             load_image(self.asset_paths["gnome_idle"]),
             [

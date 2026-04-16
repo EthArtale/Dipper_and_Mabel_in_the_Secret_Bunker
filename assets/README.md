@@ -16,6 +16,7 @@ Place files in `assets/images/`:
 - `player_run_2.png` or `dipper_run_2.png` - second running frame
 - `player_run_3.png` or `dipper_run_3.png` - third running frame
 - `player_run_4.png` or `dipper_run_4.png` - fourth running frame
+- `boss_idle.png` - boss sprite for level 3
 - `gnome_idle.png` - idle frame for the level 1 gnome enemy
 - `gnome_run_1.png` ... `gnome_run_4.png` - running animation frames for the level 1 gnome enemy
 - `bunker_background.png` or `bunker_background.jpg` - level 2 bunker background
