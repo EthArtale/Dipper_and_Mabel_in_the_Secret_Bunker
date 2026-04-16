@@ -1073,14 +1073,26 @@ class BunkerLevel:
 
 
 class BossLevel:
-    sprite = None
+    sprites = []
 
     @classmethod
     def set_sprite(cls, sprite):
-        cls.sprite = trim_transparent_bounds(sprite)
+        cls.sprites = []
+        if sprite is None:
+            return
+        width, height = sprite.get_size()
+        frames = []
+        if width > height and width % height == 0:
+            frame_count = width // height
+            for index in range(frame_count):
+                frame = sprite.subsurface((index * height, 0, height, height)).copy()
+                frames.append(trim_transparent_bounds(frame))
+        else:
+            frames.append(trim_transparent_bounds(sprite))
+        cls.sprites = [frame for frame in frames if frame is not None]
 
     def __init__(self):
-        self.length = 2200
+        self.length = 3000
         self.reset()
 
     def reset(self):
@@ -1092,31 +1104,38 @@ class BossLevel:
         self.camera_x = 0
         self.particles = []
         self.platforms = [
-            pygame.Rect(220, 500, 210, 24),
-            pygame.Rect(500, 415, 170, 24),
-            pygame.Rect(860, 360, 170, 24),
-            pygame.Rect(1170, 360, 170, 24),
-            pygame.Rect(1530, 415, 170, 24),
-            pygame.Rect(1830, 500, 210, 24),
+            pygame.Rect(230, 520, 220, 24),
+            pygame.Rect(520, 445, 180, 24),
+            pygame.Rect(860, 380, 180, 24),
+            pygame.Rect(1210, 345, 190, 24),
+            pygame.Rect(1600, 345, 190, 24),
+            pygame.Rect(1960, 380, 180, 24),
+            pygame.Rect(2290, 445, 180, 24),
+            pygame.Rect(2570, 520, 220, 24),
         ]
         self.hidden_platforms = [
-            pygame.Rect(670, 300, 130, 20),
-            pygame.Rect(1035, 95, 130, 20),
-            pygame.Rect(1370, 300, 130, 20),
+            pygame.Rect(700, 310, 130, 20),
+            pygame.Rect(1440, 120, 130, 20),
+            pygame.Rect(2140, 310, 130, 20),
         ]
         self.boss_rect = pygame.Rect(self.length // 2 - 80, 145, 160, 190)
+        self.boss_anchor_x = [880, self.length // 2, 2120]
+        self.boss_teleport_timer = 1.9
         self.boss_health = 12
         self.boss_fire_timer = 1.1
+        self.ground_burst_timer = 6.4
         self.distortion = 0.0
         self.projectiles = []
+        self.telegraphs = []
+        self.ground_telegraphs = []
         self.weak_points = []
         self.weak_timer = 2.8
         self.stan_ready = False
-        self.stan_rect = pygame.Rect(self.length - 230, GROUND_Y - 82, 46, 82)
-        self.portal_rect = pygame.Rect(self.length - 180, 420, 88, 180)
+        self.stan_rect = pygame.Rect(self.length - 250, GROUND_Y - 82, 46, 82)
+        self.portal_rect = pygame.Rect(self.length - 190, 420, 88, 180)
         self.win = False
 
-    def spawn_projectile(self):
+    def create_dark_energy_attack(self):
         origin = pygame.Vector2(self.boss_rect.centerx, self.boss_rect.centery)
         target = pygame.Vector2(self.player.rect.centerx, self.player.rect.centery)
         direction = target - origin
@@ -1124,17 +1143,61 @@ class BossLevel:
             direction = pygame.Vector2(-1, 0)
         direction = direction.normalize()
         direction.rotate_ip(random.uniform(-18, 18))
-        self.projectiles.append({"pos": pygame.Vector2(origin), "vel": direction * random.uniform(260, 380), "radius": random.randint(12, 18)})
+        return {
+            "origin": pygame.Vector2(origin),
+            "dir": pygame.Vector2(direction),
+            "travel": 0.0,
+            "speed": random.uniform(1180, 1460),
+            "max_length": random.randint(540, 760),
+            "width": random.randint(9, 13),
+            "wave_amp": random.uniform(10.0, 18.0),
+            "wave_freq": random.uniform(8.0, 12.0),
+            "wave_speed": random.uniform(7.0, 10.0),
+            "phase": random.uniform(0.0, math.tau),
+            "anim_time": 0.0,
+        }
+
+    def spawn_projectile(self):
+        self.projectiles.append(self.create_dark_energy_attack())
+
+    def queue_telegraphed_attack(self):
+        attack = self.create_dark_energy_attack()
+        attack["travel"] = attack["max_length"]
+        self.telegraphs.append({"attack": attack, "timer": 0.42})
+
+    def queue_ground_burst(self):
+        burst_count = random.randint(4, 6)
+        arena_left = 220
+        arena_right = self.length - 220
+        candidate_x = [360, 560, 820, 1060, 1300, 1540, 1780, 2020, 2260, 2500, 2740]
+        player_bias = clamp(self.player.rect.centerx, arena_left, arena_right)
+        candidate_x.sort(key=lambda x: (abs(x - player_bias), random.random()))
+        chosen = sorted(candidate_x[:burst_count])
+        for x in chosen:
+            self.ground_telegraphs.append(
+                {
+                    "x": x,
+                    "timer": 0.72,
+                    "width": random.randint(26, 38),
+                    "phase": random.uniform(0.0, math.tau),
+                }
+            )
 
     def spawn_weak_point(self):
         if len(self.weak_points) >= 2:
             return
         pool = [
+            pygame.Rect(self.boss_rect.left - 340, 470, 34, 34),
             pygame.Rect(self.boss_rect.left - 270, 400, 34, 34),
+            pygame.Rect(self.boss_rect.left - 190, 330, 34, 34),
             pygame.Rect(self.boss_rect.left - 105, 250, 34, 34),
+            pygame.Rect(self.boss_rect.centerx - 110, 165, 34, 34),
             pygame.Rect(self.boss_rect.centerx - 17, 210, 34, 34),
+            pygame.Rect(self.boss_rect.centerx + 74, 165, 34, 34),
             pygame.Rect(self.boss_rect.right + 70, 250, 34, 34),
+            pygame.Rect(self.boss_rect.right + 150, 330, 34, 34),
             pygame.Rect(self.boss_rect.right + 230, 400, 34, 34),
+            pygame.Rect(self.boss_rect.right + 300, 470, 34, 34),
         ]
         rect = random.choice(pool).copy()
         if any(item["rect"].colliderect(rect) for item in self.weak_points):
@@ -1182,20 +1245,69 @@ class BossLevel:
                 player.vel.y = 0
                 player.on_ground = True
 
+        if not self.stan_ready:
+            self.boss_teleport_timer -= dt
+            if self.boss_teleport_timer <= 0:
+                choices = [anchor for anchor in self.boss_anchor_x if abs(anchor - self.boss_rect.centerx) > 20]
+                if choices:
+                    self.boss_rect.centerx = random.choice(choices)
+                    self.distortion = max(self.distortion, 0.5)
+                self.boss_teleport_timer = random.uniform(2.4, 3.8)
+
         self.camera_x = clamp(player.rect.centerx - WIDTH // 2, 0, self.length - WIDTH)
 
         self.boss_fire_timer -= dt
         if self.boss_fire_timer <= 0 and not self.stan_ready:
-            self.spawn_projectile()
-            self.boss_fire_timer = 0.95 if self.boss_health > 5 else 0.68
+            self.queue_telegraphed_attack()
+            self.boss_fire_timer = 0.78 if self.boss_health > 5 else 0.52
+        self.ground_burst_timer -= dt
+        if self.ground_burst_timer <= 0 and not self.stan_ready:
+            self.queue_ground_burst()
+            self.ground_burst_timer = random.uniform(6.8, 9.2)
+        for warning in list(self.telegraphs):
+            warning["timer"] -= dt
+            warning["attack"]["anim_time"] += dt
+            if warning["timer"] <= 0:
+                released = warning["attack"].copy()
+                released["origin"] = pygame.Vector2(warning["attack"]["origin"])
+                released["dir"] = pygame.Vector2(warning["attack"]["dir"])
+                released["travel"] = 0.0
+                released["anim_time"] = 0.0
+                self.projectiles.append(released)
+                self.telegraphs.remove(warning)
+        for warning in list(self.ground_telegraphs):
+            warning["timer"] -= dt
+            if warning["timer"] <= 0:
+                direction = pygame.Vector2(random.uniform(-0.22, 0.22), -1).normalize()
+                self.projectiles.append(
+                    {
+                        "origin": pygame.Vector2(warning["x"], GROUND_Y),
+                        "dir": direction,
+                        "travel": 0.0,
+                        "speed": random.uniform(980, 1180),
+                        "max_length": random.randint(300, 420),
+                        "width": random.randint(8, 12),
+                        "wave_amp": random.uniform(12.0, 22.0),
+                        "wave_freq": random.uniform(9.0, 14.0),
+                        "wave_speed": random.uniform(8.0, 12.0),
+                        "phase": warning["phase"],
+                        "anim_time": 0.0,
+                    }
+                )
+                self.ground_telegraphs.remove(warning)
         # Enemy attack logic for level 3: boss projectiles and weak-point phases.
         for projectile in list(self.projectiles):
-            projectile["pos"] += projectile["vel"] * dt
-            if projectile["pos"].x < -80 or projectile["pos"].x > self.length + 80 or projectile["pos"].y < -80 or projectile["pos"].y > HEIGHT + 80:
+            projectile["anim_time"] += dt
+            projectile["travel"] += projectile["speed"] * dt
+            if projectile["travel"] >= projectile["max_length"]:
                 self.projectiles.remove(projectile)
                 continue
-            rect = pygame.Rect(projectile["pos"].x - projectile["radius"], projectile["pos"].y - projectile["radius"], projectile["radius"] * 2, projectile["radius"] * 2)
-            if player.rect.colliderect(rect):
+            hit = False
+            for point in build_dark_energy_points(projectile):
+                if player.rect.collidepoint(point):
+                    hit = True
+                    break
+            if hit:
                 if player.apply_damage():
                     self.particles.append(FloatText("-1", player.rect.x, player.rect.y - 18, CRIMSON))
                 self.projectiles.remove(projectile)
@@ -1292,10 +1404,20 @@ class BossLevel:
         draw_portal(surface, self.portal_rect.move(-self.camera_x, 0), self.player.portal_charge / 3.2)
         if not self.stan_ready:
             boss_rect = self.boss_rect.move(-self.camera_x, 0)
-            if BossLevel.sprite:
-                target_size = fit_size(BossLevel.sprite.get_size(), (boss_rect.width + 90, boss_rect.height + 90))
-                scaled = pygame.transform.smoothscale(BossLevel.sprite, target_size)
-                draw_rect = scaled.get_rect(center=boss_rect.center)
+            hover_time = pygame.time.get_ticks() * 0.001
+            hover_y = math.sin(hover_time * 2.2) * 14 + math.sin(hover_time * 4.4 + 0.8) * 4
+            sway_x = math.sin(hover_time * 1.6 + 0.4) * 6
+            if BossLevel.sprites:
+                frame_index = int(pygame.time.get_ticks() * 0.0012) % len(BossLevel.sprites)
+                boss_sprite = BossLevel.sprites[frame_index]
+                target_size = fit_size(boss_sprite.get_size(), (boss_rect.width + 90, boss_rect.height + 90))
+                scaled = pygame.transform.smoothscale(boss_sprite, target_size)
+                shadow_rect = pygame.Rect(0, 0, int(scaled.get_width() * 0.72), 22)
+                shadow_rect.center = (boss_rect.centerx, boss_rect.bottom + 26)
+                shadow = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
+                pygame.draw.ellipse(shadow, (8, 6, 14, 105), shadow.get_rect())
+                surface.blit(shadow, shadow_rect.topleft)
+                draw_rect = scaled.get_rect(center=(boss_rect.centerx + round(sway_x), boss_rect.centery + round(hover_y)))
                 pulse = 0.92 + 0.08 * math.sin(pygame.time.get_ticks() * 0.0013)
                 if pulse != 1.0:
                     tinted = scaled.copy()
@@ -1303,13 +1425,21 @@ class BossLevel:
                     scaled = tinted
                 surface.blit(scaled, draw_rect.topleft)
             else:
-                draw_bill_shadow(surface, boss_rect, self.boss_health)
+                floating_rect = boss_rect.move(round(sway_x), round(hover_y))
+                shadow_rect = pygame.Rect(0, 0, int(floating_rect.width * 0.72), 18)
+                shadow_rect.center = (boss_rect.centerx, boss_rect.bottom + 18)
+                shadow = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
+                pygame.draw.ellipse(shadow, (8, 6, 14, 100), shadow.get_rect())
+                surface.blit(shadow, shadow_rect.topleft)
+                draw_bill_shadow(surface, floating_rect, self.boss_health)
         else:
             draw_stan(surface, self.stan_rect.move(-self.camera_x, 0))
+        for warning in self.telegraphs:
+            draw_attack_telegraph(surface, warning["attack"], warning["timer"], self.camera_x)
+        for warning in self.ground_telegraphs:
+            draw_ground_attack_telegraph(surface, warning, self.camera_x)
         for projectile in self.projectiles:
-            center = (round(projectile["pos"].x - self.camera_x), round(projectile["pos"].y))
-            pygame.draw.circle(surface, (114, 245, 255), center, projectile["radius"])
-            pygame.draw.circle(surface, WHITE, center, max(5, projectile["radius"] // 2))
+            draw_dark_energy_stream(surface, projectile, self.camera_x)
         for point in self.weak_points:
             color = CYAN if self.player.reveal_active else (71, 103, 111)
             center = (point["rect"].centerx - self.camera_x, point["rect"].centery)
@@ -1461,6 +1591,70 @@ def draw_bill_shadow(surface, rect, health):
     pygame.draw.line(surface, BLACK, (center[0] - 36, rect.y + 120), (center[0] + 36, rect.y + 106), 4)
     for i in range(max(0, health)):
         pygame.draw.line(surface, (255, 215, 130), (rect.x + 8 + i * 12, rect.bottom + 24), (rect.x + 16 + i * 12, rect.bottom + 24), 4)
+
+
+def build_dark_energy_points(projectile, camera_x=0):
+    direction = projectile["dir"]
+    normal = pygame.Vector2(-direction.y, direction.x)
+    length = projectile["travel"]
+    anim_time = projectile["anim_time"]
+    points = []
+    segments = 8
+    for index in range(segments + 1):
+        t = index / segments
+        along = projectile["origin"] + direction * (length * t)
+        wave = math.sin(anim_time * projectile["wave_speed"] + t * projectile["wave_freq"] + projectile["phase"])
+        offset = normal * (wave * projectile["wave_amp"] * (0.2 + 0.8 * t))
+        point = along + offset
+        points.append((round(point.x - camera_x), round(point.y)))
+    return points
+
+
+def draw_dark_energy_stream(surface, projectile, camera_x=0):
+    points = build_dark_energy_points(projectile, camera_x)
+    if len(points) < 2:
+        return
+    glow = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    outer_width = max(15, projectile["width"] + 12)
+    mid_width = max(9, projectile["width"] + 5)
+    core_width = max(4, projectile["width"] - 2)
+    pygame.draw.lines(glow, (18, 8, 28, 125), False, points, outer_width)
+    pygame.draw.lines(glow, (34, 12, 52, 94), False, points, mid_width)
+    surface.blit(glow, (0, 0))
+    pygame.draw.lines(surface, (12, 6, 20), False, points, outer_width - 4)
+    pygame.draw.lines(surface, (36, 14, 58), False, points, mid_width)
+    pygame.draw.lines(surface, (84, 44, 128), False, points, core_width)
+    head = points[0]
+    pygame.draw.circle(surface, (28, 10, 44), head, max(8, projectile["width"] + 2))
+    pygame.draw.circle(surface, (94, 48, 146), head, max(4, projectile["width"] // 2))
+
+
+def draw_attack_telegraph(surface, attack, timer, camera_x=0):
+    points = build_dark_energy_points(attack, camera_x)
+    if len(points) < 2:
+        return
+    pulse = 0.55 + 0.45 * math.sin(pygame.time.get_ticks() * 0.018)
+    width = max(10, attack["width"] + 8)
+    warn = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    pygame.draw.lines(warn, (255, 96, 126, int(58 + 56 * pulse)), False, points, width)
+    pygame.draw.lines(warn, (255, 214, 130, int(34 + 42 * pulse)), False, points, max(3, width // 3))
+    surface.blit(warn, (0, 0))
+    head = points[-1]
+    pygame.draw.circle(surface, (255, 120, 138), head, max(6, attack["width"]))
+    pygame.draw.circle(surface, (255, 238, 184), head, max(2, attack["width"] // 3))
+
+
+def draw_ground_attack_telegraph(surface, warning, camera_x=0):
+    pulse = 0.55 + 0.45 * math.sin(pygame.time.get_ticks() * 0.016 + warning["phase"])
+    width = warning["width"]
+    x = round(warning["x"] - camera_x)
+    base_rect = pygame.Rect(x - width, GROUND_Y - 22, width * 2, 26)
+    glow = pygame.Surface((base_rect.width + 36, base_rect.height + 22), pygame.SRCALPHA)
+    pygame.draw.ellipse(glow, (255, 82, 110, int(48 + 44 * pulse)), glow.get_rect())
+    surface.blit(glow, (base_rect.x - 18, base_rect.y - 10))
+    pygame.draw.ellipse(surface, (255, 110, 136), base_rect, 3)
+    inner = base_rect.inflate(-18, -10)
+    pygame.draw.ellipse(surface, (255, 222, 148), inner, 2)
 
 
 def draw_portal(surface, rect, charge):
