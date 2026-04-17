@@ -5,6 +5,7 @@ import struct
 import tempfile
 import wave
 import json
+import sys
 from dataclasses import dataclass
 
 import pygame
@@ -63,12 +64,13 @@ PARALLAX_IMAGE_CACHE = {}
 TILESET_CACHE = {}
 SFX_SOUNDS = {}
 
-BASE_DIR = os.path.dirname(__file__)
-ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+APP_DIR = os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+BUNDLE_DIR = getattr(sys, "_MEIPASS", APP_DIR)
+ASSETS_DIR = os.path.join(BUNDLE_DIR, "assets")
 IMAGES_DIR = os.path.join(ASSETS_DIR, "images")
 FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
 AUDIO_DIR = os.path.join(ASSETS_DIR, "audio")
-SAVE_FILE = os.path.join(BASE_DIR, "savegame.json")
+SAVE_FILE = os.path.join(APP_DIR, "savegame.json")
 
 
 def clamp(value, low, high):

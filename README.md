@@ -4,6 +4,12 @@
 
 The project is built as a single-file game in `main.py`, with external assets loaded from `assets/` when available and procedural fallbacks used when they are missing.
 
+## Play the Game
+
+If you just want to play on Windows, download the packaged `.exe` from the repository's GitHub `Releases` page and run `DMSB.exe`.
+
+If you want to run from source, use the Python instructions below.
+
 ## Features
 
 - 3 playable levels with different pacing and mechanics
@@ -52,6 +58,16 @@ The project is built as a single-file game in `main.py`, with external assets lo
 
 ## Run
 
+### Windows `.exe`
+
+- packaged build: `DMSB.exe`
+- the executable contains the game code and bundled assets
+- `savegame.json` is created next to the `.exe` after the first run
+
+For GitHub, the recommended approach is to attach `DMSB.exe` to a Release instead of committing generated binaries directly into the repository history.
+
+### Run From Source
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip setuptools wheel
@@ -85,6 +101,7 @@ See `requirements.txt`.
 ```text
 GravityFalls/
 |- main.py
+|- main.spec
 |- requirements.txt
 |- README.md
 |- assets/
@@ -92,6 +109,9 @@ GravityFalls/
 |  |- images/
 |  |- fonts/
 |  `- audio/
+|- dist/
+|- build/
+|- DMSB.exe
 |- savegame.json
 |- tmp_bunker_preview.png
 |- .venv/
@@ -102,6 +122,8 @@ Important notes:
 
 - `main.py` contains the main loop, levels, UI, audio generation, and rendering helpers.
 - `assets/README.md` documents replaceable asset filenames in detail.
+- `main.spec` stores the `PyInstaller` build configuration.
+- `DMSB.exe` is the packaged Windows build artifact.
 - `savegame.json` is created automatically and stores progress.
 - procedural audio may create temporary `.wav` files in the system temp directory.
 
@@ -150,6 +172,8 @@ If you publish this project to Git, it is better not to commit generated or loca
 
 - `.venv/`
 - `__pycache__/`
+- `build/`
+- `dist/`
 - `savegame.json`
 - `tmp_bunker_preview.png`
 
@@ -158,10 +182,14 @@ Suggested `.gitignore` entries:
 ```gitignore
 .venv/
 __pycache__/
+build/
+dist/
 *.pyc
 savegame.json
 tmp_bunker_preview.png
 ```
+
+Keep `main.spec`, source files, and assets in the repository, and publish `DMSB.exe` through GitHub Releases when you want to distribute a playable build.
 
 Large custom binary assets can also be excluded or moved to Git LFS if the repository grows.
 
