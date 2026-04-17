@@ -44,7 +44,24 @@ FOREST_LAYER_OVERRIDES = {
     12: {"speed": 0.67, "scale": 1.25, "offset_y": -175},
 }
 
+BUNKER_LAYER_OVERRIDES = {
+    1: {"speed": 0.04, "scale": 1.02, "offset_y": -18},
+    2: {"speed": 0.07, "scale": 1.02, "offset_y": -18},
+    3: {"speed": 0.10, "scale": 1.02, "offset_y": -18},
+    4: {"speed": 0.14, "scale": 1.02, "offset_y": -18},
+    5: {"speed": 0.18, "scale": 1.02, "offset_y": -18},
+    6: {"speed": 0.23, "scale": 1.02, "offset_y": -18},
+    7: {"speed": 0.28, "scale": 1.02, "offset_y": -18},
+    8: {"speed": 0.34, "scale": 1.02, "offset_y": -18},
+    9: {"speed": 0.41, "scale": 1.02, "offset_y": -18},
+    10: {"speed": 0.49, "scale": 1.02, "offset_y": -18},
+    11: {"speed": 0.58, "scale": 1.02, "offset_y": -18},
+    12: {"speed": 0.68, "scale": 1.02, "offset_y": -18},
+}
+
 PARALLAX_IMAGE_CACHE = {}
+TILESET_CACHE = {}
+SFX_SOUNDS = {}
 
 BASE_DIR = os.path.dirname(__file__)
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
@@ -83,6 +100,110 @@ def load_scaled_image(path, size):
         return pygame.transform.smoothscale(image, size)
     except pygame.error:
         return None
+
+
+def synth_sfx(name):
+    sample_rate = 22050
+    duration_map = {
+        "jump": 0.12,
+        "page": 0.18,
+        "hit": 0.16,
+        "cipher_open": 0.2,
+        "cipher_solve": 0.42,
+        "burn": 0.24,
+        "boss_teleport": 0.28,
+        "boss_attack": 0.18,
+        "portal": 0.3,
+        "menu": 0.09,
+    }
+    seconds = duration_map.get(name, 0.16)
+    path = os.path.join(tempfile.gettempdir(), f"gravityfalls_{name}.wav")
+    if os.path.exists(path):
+        return path
+
+    frames = []
+    total_frames = int(sample_rate * seconds)
+    for index in range(total_frames):
+        t = index / sample_rate
+        env = max(0.0, 1.0 - (t / seconds))
+        env *= env
+        sample = 0.0
+        if name == "jump":
+            freq = 560 - 260 * (t / seconds)
+            sample = math.sin(2 * math.pi * freq * t) * env * 0.5
+        elif name == "page":
+            freq = 820 + 180 * math.sin(t * 28)
+            sample = (math.sin(2 * math.pi * freq * t) + 0.4 * math.sin(2 * math.pi * freq * 1.5 * t)) * env * 0.32
+        elif name == "hit":
+            noise = (random.random() * 2 - 1) * 0.7
+            tone = math.sin(2 * math.pi * 160 * t) * 0.18
+            sample = (noise + tone) * env * 0.42
+        elif name == "cipher_open":
+            freq = 380 + 140 * (t / seconds)
+            sample = (math.sin(2 * math.pi * freq * t) + 0.5 * math.sin(2 * math.pi * (freq * 1.98) * t)) * env * 0.32
+        elif name == "cipher_solve":
+            base = 420 + 110 * math.sin(t * 10)
+            sample = (
+                math.sin(2 * math.pi * base * t)
+                + 0.55 * math.sin(2 * math.pi * base * 1.5 * t + 0.4)
+                + 0.25 * math.sin(2 * math.pi * base * 2.1 * t)
+            ) * env * 0.28
+        elif name == "burn":
+            noise = (random.random() * 2 - 1) * 0.5
+            tone = math.sin(2 * math.pi * (240 + t * 420) * t) * 0.25
+            sample = (noise * 0.7 + tone) * env * 0.36
+        elif name == "boss_teleport":
+            freq = 260 - 120 * (t / seconds)
+            sample = (
+                math.sin(2 * math.pi * freq * t)
+                + 0.45 * math.sin(2 * math.pi * freq * 0.5 * t + 0.8)
+                + (random.random() * 2 - 1) * 0.18
+            ) * env * 0.4
+        elif name == "boss_attack":
+            freq = 170 + 50 * math.sin(t * 24)
+            sample = (
+                math.sin(2 * math.pi * freq * t)
+                + 0.3 * math.sin(2 * math.pi * freq * 3.0 * t)
+                + (random.random() * 2 - 1) * 0.08
+            ) * env * 0.34
+        elif name == "portal":
+            freq = 260 + 240 * (t / seconds)
+            sample = (
+                math.sin(2 * math.pi * freq * t)
+                + 0.4 * math.sin(2 * math.pi * freq * 2.0 * t + 0.4)
+            ) * env * 0.28
+        elif name == "menu":
+            freq = 720 + 110 * (t / seconds)
+            sample = math.sin(2 * math.pi * freq * t) * env * 0.22
+        value = int(clamp(sample, -1.0, 1.0) * 32767)
+        frames.append(struct.pack("<hh", value, value))
+
+    with wave.open(path, "wb") as wav_file:
+        wav_file.setnchannels(2)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(b"".join(frames))
+    return path
+
+
+def load_sfx_sound(name, volume=0.5):
+    if not pygame.mixer.get_init():
+        return None
+    try:
+        sound = pygame.mixer.Sound(synth_sfx(name))
+        sound.set_volume(volume)
+        return sound
+    except pygame.error:
+        return None
+
+
+def play_sfx(name):
+    sound = SFX_SOUNDS.get(name)
+    if sound is not None:
+        try:
+            sound.play()
+        except pygame.error:
+            pass
 
 
 def load_image(path):
@@ -219,52 +340,94 @@ def draw_stone_surface(surface, rect, palette, camera_x=0, border_radius=6):
     pygame.draw.line(surface, shift_color(shadow, -10), (rect.x + 4, rect.bottom - 3), (rect.right - 4, rect.bottom - 3), 2)
 
 
+def draw_tiled_surface(surface, rect, tile_image, border_radius=6, overlay_color=None, border_color=None):
+    if tile_image is None:
+        return
+    if rect.width <= 0 or rect.height <= 0:
+        return
+    cache_key = (id(tile_image), 64)
+    tile = TILESET_CACHE.get(cache_key)
+    if tile is None:
+        source = crop_visible_bounds(tile_image, min_alpha=1) or tile_image
+        tile = pygame.transform.smoothscale(source, (64, 64))
+        TILESET_CACHE[cache_key] = tile
+
+    temp = pygame.Surface(rect.size, pygame.SRCALPHA)
+    for y in range(0, rect.height, tile.get_height()):
+        for x in range(0, rect.width, tile.get_width()):
+            temp.blit(tile, (x, y))
+    if overlay_color:
+        temp.fill(overlay_color, special_flags=pygame.BLEND_RGBA_MULT)
+    mask = pygame.Surface(rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=border_radius)
+    temp.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    surface.blit(temp, rect.topleft)
+    if border_color:
+        pygame.draw.rect(surface, border_color, rect, 2, border_radius=border_radius)
+
+
 def draw_flashlight_beam(surface, origin, facing, active=True):
     if not active:
         return
     tick = pygame.time.get_ticks()
-    flicker = 0.96 + 0.04 * math.sin(tick * 0.01)
-    beam_w = 210
+    flicker = 0.96 + 0.04 * math.sin(tick * 0.008)
+    beam_w = 238
     beam_h = 132
     beam = pygame.Surface((beam_w, beam_h), pygame.SRCALPHA)
 
-    outer = [(10, beam_h // 2), (102, 22), (beam_w - 12, 38), (beam_w - 12, beam_h - 38), (102, beam_h - 22)]
-    mid = [(14, beam_h // 2), (92, 36), (beam_w - 34, 48), (beam_w - 34, beam_h - 48), (92, beam_h - 36)]
-    core = [(18, beam_h // 2), (78, 47), (beam_w - 70, 56), (beam_w - 70, beam_h - 56), (78, beam_h - 47)]
+    center_y = beam_h / 2
+    gradient = pygame.Surface((beam_w, beam_h), pygame.SRCALPHA)
+    for x in range(beam_w):
+        along = x / max(1, beam_w - 1)
+        spread = 10 + along * 34
+        softness = 0.7 + along * 0.3
+        alpha = int((1.0 - along) ** 2.2 * 26 * flicker)
+        if alpha <= 0:
+            continue
+        top = int(center_y - spread * softness)
+        bottom = int(center_y + spread * softness)
+        pygame.draw.line(gradient, (255, 244, 220, alpha), (x, top), (x, bottom))
+    beam.blit(gradient, (0, 0))
 
-    pygame.draw.polygon(beam, (255, 232, 178, int(22 * flicker)), outer)
-    pygame.draw.polygon(beam, (255, 238, 196, int(30 * flicker)), mid)
-    pygame.draw.polygon(beam, (255, 244, 218, int(18 * flicker)), core)
-
-    fog = pygame.Surface((beam_w, beam_h), pygame.SRCALPHA)
-    for index in range(5):
-        glow_w = 44 + index * 26
-        glow_h = 24 + index * 12
-        glow_x = beam_w - 70 - index * 24
-        glow_y = beam_h // 2 - glow_h // 2
-        pygame.draw.ellipse(fog, (255, 242, 212, max(4, 14 - index * 2)), (glow_x, glow_y, glow_w, glow_h))
-    beam.blit(fog, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+    # Keep only a very soft core so the beam guides the eye without covering the scene.
+    core = pygame.Surface((beam_w, beam_h), pygame.SRCALPHA)
+    for x in range(beam_w):
+        along = x / max(1, beam_w - 1)
+        spread = 6 + along * 18
+        alpha = int((1.0 - along) ** 2.45 * 18 * flicker)
+        if alpha <= 0:
+            continue
+        pygame.draw.line(
+            core,
+            (255, 250, 238, alpha),
+            (x, int(center_y - spread)),
+            (x, int(center_y + spread)),
+        )
+    beam.blit(core, (0, 0))
 
     dust = pygame.Surface((beam_w, beam_h), pygame.SRCALPHA)
     for index in range(5):
-        px = 70 + index * 24 + int(5 * math.sin(tick * 0.002 + index))
+        px = 46 + index * 32 + int(5 * math.sin(tick * 0.002 + index))
         py = 30 + (index * 17) % (beam_h - 60)
         radius = 1 + (index % 2)
-        pygame.draw.circle(dust, (255, 245, 225, 10), (px, py), radius)
+        pygame.draw.circle(dust, (255, 245, 225, 8), (px, py), radius)
     beam.blit(dust, (0, 0))
 
     if facing < 0:
         beam = pygame.transform.flip(beam, True, False)
 
     beam_rect = beam.get_rect()
-    beam_rect.midleft = (origin[0] - 8, origin[1]) if facing > 0 else (origin[0] + 8, origin[1])
-    surface.blit(beam, beam_rect.topleft, special_flags=pygame.BLEND_RGBA_ADD)
+    if facing > 0:
+        beam_rect.midleft = (origin[0] - 4, origin[1])
+    else:
+        beam_rect.midright = (origin[0] + 4, origin[1])
+    surface.blit(beam, beam_rect.topleft)
 
-    glow = pygame.Surface((48, 48), pygame.SRCALPHA)
-    pygame.draw.circle(glow, (255, 223, 150, int(34 * flicker)), (24, 24), 12)
-    pygame.draw.circle(glow, (255, 243, 214, int(46 * flicker)), (24, 24), 5)
+    glow = pygame.Surface((40, 40), pygame.SRCALPHA)
+    pygame.draw.circle(glow, (255, 223, 150, int(24 * flicker)), (20, 20), 12)
+    pygame.draw.circle(glow, (255, 243, 214, int(38 * flicker)), (20, 20), 5)
     glow_rect = glow.get_rect(center=origin)
-    surface.blit(glow, glow_rect.topleft, special_flags=pygame.BLEND_RGBA_ADD)
+    surface.blit(glow, glow_rect.topleft)
 
 
 def draw_level_background(surface, image, camera_x=0, max_camera=0):
@@ -460,7 +623,7 @@ class Player:
     def __init__(self):
         self.rect = pygame.Rect(120, GROUND_Y - 78, 42, 78)
         self.vel = pygame.Vector2()
-        self.speed = 370
+        self.speed = 520
         self.jump_strength = -650
         self.on_ground = False
         self.health = 5
@@ -565,20 +728,20 @@ class Player:
 class GnomeSprite:
     sprites = {"idle": None, "run": []}
     palette = {
-        "skin": (240, 214, 186),
-        "nose": (224, 176, 144),
-        "beard": (245, 244, 236),
-        "beard_shade": (205, 212, 214),
-        "tunic": (92, 118, 84),
-        "tunic_light": (120, 150, 110),
-        "belt": (96, 61, 32),
-        "boot": (64, 48, 42),
-        "hat": (170, 34, 36),
-        "hat_light": (212, 68, 72),
-        "gold": (233, 193, 94),
-        "outline": (36, 28, 24),
-        "lantern": (244, 213, 120),
-        "glow": (255, 224, 146, 72),
+        "skin": (234, 204, 178),
+        "nose": (220, 154, 126),
+        "beard": (244, 242, 232),
+        "beard_shade": (198, 198, 196),
+        "tunic": (78, 106, 74),
+        "tunic_light": (112, 144, 102),
+        "belt": (92, 58, 31),
+        "boot": (56, 42, 34),
+        "hat": (176, 32, 36),
+        "hat_light": (220, 70, 76),
+        "gold": (226, 188, 96),
+        "outline": (30, 22, 20),
+        "lantern": (246, 214, 126),
+        "glow": (255, 226, 148, 78),
         "eye": (18, 18, 22),
     }
 
@@ -609,62 +772,64 @@ class GnomeSprite:
     @classmethod
     def build_frame(cls, step, bob=0, blink=False):
         colors = cls.palette
-        width, height = 72, 64
+        width, height = 76, 66
         surface = pygame.Surface((width, height), pygame.SRCALPHA)
         base_y = 10 + bob
 
-        glow = pygame.Surface((30, 30), pygame.SRCALPHA)
-        pygame.draw.circle(glow, colors["glow"], (15, 15), 15)
-        surface.blit(glow, (40, base_y + 18))
-        pygame.draw.ellipse(surface, (0, 0, 0, 55), (17, 54 + bob, 38, 8))
+        glow = pygame.Surface((32, 32), pygame.SRCALPHA)
+        pygame.draw.circle(glow, colors["glow"], (16, 16), 16)
+        surface.blit(glow, (42, base_y + 18))
+        pygame.draw.ellipse(surface, (0, 0, 0, 58), (16, 55 + bob, 42, 8))
 
-        pygame.draw.polygon(surface, colors["hat"], [(18, base_y + 12), (31, base_y - 2), (43, base_y + 11), (38, base_y + 16), (23, base_y + 16)])
-        pygame.draw.rect(surface, colors["hat"], (17, base_y + 13, 27, 6), border_radius=3)
-        pygame.draw.rect(surface, colors["hat_light"], (23, base_y + 4, 6, 9), border_radius=2)
-        pygame.draw.circle(surface, colors["gold"], (39, base_y + 8), 3)
+        pygame.draw.polygon(surface, colors["hat"], [(16, base_y + 15), (30, base_y - 6), (46, base_y + 13), (41, base_y + 19), (22, base_y + 19)])
+        pygame.draw.rect(surface, colors["hat"], (16, base_y + 15, 30, 6), border_radius=3)
+        pygame.draw.rect(surface, colors["hat_light"], (23, base_y + 2, 7, 10), border_radius=2)
+        pygame.draw.circle(surface, colors["gold"], (42, base_y + 9), 3)
 
-        pygame.draw.circle(surface, colors["skin"], (30, base_y + 22), 10)
-        pygame.draw.circle(surface, colors["nose"], (35, base_y + 24), 3)
-        eye_y = base_y + 21
+        pygame.draw.circle(surface, colors["skin"], (31, base_y + 24), 11)
+        pygame.draw.circle(surface, colors["nose"], (37, base_y + 27), 4)
+        eye_y = base_y + 22
         if blink:
-            pygame.draw.line(surface, colors["eye"], (26, eye_y), (29, eye_y), 2)
+            pygame.draw.line(surface, colors["eye"], (24, eye_y), (28, eye_y), 2)
         else:
-            pygame.draw.circle(surface, colors["eye"], (27, eye_y), 2)
-        pygame.draw.circle(surface, colors["eye"], (32, eye_y + 1), 1)
+            pygame.draw.circle(surface, colors["eye"], (25, eye_y), 2)
+        pygame.draw.circle(surface, colors["eye"], (31, eye_y + 1), 1)
+        pygame.draw.line(surface, colors["eye"], (21, eye_y - 4), (27, eye_y - 6), 1)
+        pygame.draw.line(surface, colors["eye"], (29, eye_y - 5), (34, eye_y - 7), 1)
 
-        pygame.draw.polygon(surface, colors["beard"], [(20, base_y + 25), (40, base_y + 25), (45, base_y + 42), (30, base_y + 52), (15, base_y + 42)])
-        pygame.draw.line(surface, colors["beard_shade"], (30, base_y + 27), (30, base_y + 49), 2)
-        pygame.draw.line(surface, colors["beard_shade"], (25, base_y + 31), (22, base_y + 43), 2)
-        pygame.draw.line(surface, colors["beard_shade"], (35, base_y + 31), (38, base_y + 43), 2)
+        pygame.draw.polygon(surface, colors["beard"], [(18, base_y + 28), (41, base_y + 28), (48, base_y + 44), (31, base_y + 55), (13, base_y + 44)])
+        pygame.draw.line(surface, colors["beard_shade"], (31, base_y + 30), (31, base_y + 51), 2)
+        pygame.draw.line(surface, colors["beard_shade"], (25, base_y + 34), (21, base_y + 45), 2)
+        pygame.draw.line(surface, colors["beard_shade"], (37, base_y + 34), (41, base_y + 45), 2)
 
-        pygame.draw.rect(surface, colors["tunic"], (18, base_y + 31, 24, 17), border_radius=6)
-        pygame.draw.rect(surface, colors["tunic_light"], (22, base_y + 34, 16, 6), border_radius=3)
-        pygame.draw.rect(surface, colors["belt"], (19, base_y + 41, 22, 4), border_radius=2)
-        pygame.draw.rect(surface, colors["gold"], (28, base_y + 40, 5, 6), border_radius=2)
+        pygame.draw.rect(surface, colors["tunic"], (18, base_y + 33, 26, 16), border_radius=6)
+        pygame.draw.rect(surface, colors["tunic_light"], (22, base_y + 36, 18, 6), border_radius=3)
+        pygame.draw.rect(surface, colors["belt"], (19, base_y + 43, 24, 4), border_radius=2)
+        pygame.draw.rect(surface, colors["gold"], (29, base_y + 42, 5, 6), border_radius=2)
 
-        arm_y = base_y + 34 + (1 if step in (1, 2) else 0)
-        pygame.draw.line(surface, colors["skin"], (40, base_y + 35), (48, arm_y + 3), 4)
-        pygame.draw.line(surface, colors["outline"], (49, arm_y + 5), (49, arm_y + 13), 2)
-        pygame.draw.rect(surface, (86, 68, 44), (44, arm_y + 10, 10, 12), border_radius=2)
-        pygame.draw.rect(surface, colors["lantern"], (46, arm_y + 12, 6, 6), border_radius=2)
+        arm_y = base_y + 36 + (1 if step in (1, 2) else 0)
+        pygame.draw.line(surface, colors["skin"], (41, base_y + 36), (50, arm_y + 3), 4)
+        pygame.draw.line(surface, colors["outline"], (51, arm_y + 5), (51, arm_y + 13), 2)
+        pygame.draw.rect(surface, (88, 70, 46), (46, arm_y + 10, 10, 12), border_radius=2)
+        pygame.draw.rect(surface, colors["lantern"], (48, arm_y + 12, 6, 6), border_radius=2)
 
         arm_offset = -2 if step in (0, 3) else 2
-        pygame.draw.line(surface, colors["tunic_light"], (19, base_y + 35), (13, base_y + 38 + arm_offset), 4)
+        pygame.draw.line(surface, colors["tunic_light"], (18, base_y + 36), (11, base_y + 38 + arm_offset), 4)
 
         leg_specs = [(-4, 4), (4, -4), (2, -2), (-2, 2)]
         left_dx, right_dx = leg_specs[step % len(leg_specs)]
-        hip_y = base_y + 46
-        pygame.draw.line(surface, colors["boot"], (26, hip_y), (24 + left_dx, base_y + 57), 5)
-        pygame.draw.line(surface, colors["boot"], (34, hip_y), (36 + right_dx, base_y + 57), 5)
-        pygame.draw.line(surface, colors["boot"], (20 + left_dx, base_y + 58), (28 + left_dx, base_y + 58), 4)
-        pygame.draw.line(surface, colors["boot"], (32 + right_dx, base_y + 58), (40 + right_dx, base_y + 58), 4)
+        hip_y = base_y + 47
+        pygame.draw.line(surface, colors["boot"], (27, hip_y), (25 + left_dx, base_y + 59), 5)
+        pygame.draw.line(surface, colors["boot"], (35, hip_y), (37 + right_dx, base_y + 59), 5)
+        pygame.draw.line(surface, colors["boot"], (21 + left_dx, base_y + 60), (29 + left_dx, base_y + 60), 4)
+        pygame.draw.line(surface, colors["boot"], (33 + right_dx, base_y + 60), (41 + right_dx, base_y + 60), 4)
 
-        pygame.draw.lines(surface, colors["outline"], False, [(21, base_y + 16), (18, base_y + 13), (31, base_y - 1), (42, base_y + 11)], 1)
-        pygame.draw.arc(surface, colors["outline"], (18, base_y + 12, 24, 20), math.pi, math.tau, 1)
-        pygame.draw.line(surface, colors["outline"], (20, base_y + 25), (16, base_y + 42), 1)
-        pygame.draw.line(surface, colors["outline"], (40, base_y + 25), (44, base_y + 42), 1)
-        pygame.draw.line(surface, colors["outline"], (23, base_y + 31), (23, base_y + 44), 1)
-        pygame.draw.line(surface, colors["outline"], (37, base_y + 31), (37, base_y + 44), 1)
+        pygame.draw.lines(surface, colors["outline"], False, [(20, base_y + 19), (17, base_y + 15), (30, base_y - 5), (45, base_y + 13)], 1)
+        pygame.draw.arc(surface, colors["outline"], (18, base_y + 14, 26, 20), math.pi, math.tau, 1)
+        pygame.draw.line(surface, colors["outline"], (18, base_y + 28), (14, base_y + 44), 1)
+        pygame.draw.line(surface, colors["outline"], (41, base_y + 28), (46, base_y + 44), 1)
+        pygame.draw.line(surface, colors["outline"], (23, base_y + 33), (23, base_y + 45), 1)
+        pygame.draw.line(surface, colors["outline"], (39, base_y + 33), (39, base_y + 45), 1)
         return trim_transparent_bounds(surface)
 
     @classmethod
@@ -713,6 +878,16 @@ class ForestLevel:
     def spawn_hazard(self):
         choice = random.choice(["gnome", "rift"])
         x = self.camera_x + WIDTH + random.randint(80, 280)
+        recent_hazards = [hazard for hazard in self.hazards if hazard["rect"].x > self.camera_x + WIDTH - 220]
+        if recent_hazards:
+            furthest_x = max(hazard["rect"].x for hazard in recent_hazards)
+            min_gap = 150 if choice == "gnome" else 280
+            if choice == "rift":
+                min_gap = max(
+                    min_gap,
+                    340 if any(hazard["type"] == "rift" for hazard in recent_hazards) else min_gap,
+                )
+            x = max(x, furthest_x + min_gap)
         if choice == "gnome":
             rect = pygame.Rect(x, FOREST_GROUND_Y - 52, 44, 42)
             self.hazards.append(
@@ -755,16 +930,16 @@ class ForestLevel:
             self.world_speed = 320
             player.facing = 1
             if screen_x < 330:
-                player.rect.x += int(260 * dt)
+                player.rect.x += int(380 * dt)
             else:
-                self.progress += 270 * dt
+                self.progress += 390 * dt
         elif retreat:
             self.world_speed = 120
             player.facing = -1
             if screen_x > 140:
-                player.rect.x -= int(240 * dt)
+                player.rect.x -= int(350 * dt)
             else:
-                self.progress = max(0.0, self.progress - 100 * dt)
+                self.progress = max(0.0, self.progress - 180 * dt)
         else:
             self.world_speed = 0
 
@@ -774,6 +949,7 @@ class ForestLevel:
         if player.on_ground and (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]):
             player.vel.y = player.jump_strength
             player.on_ground = False
+            play_sfx("jump")
 
         player.vel.y += 1550 * dt
         player.rect.y += int(player.vel.y * dt)
@@ -793,7 +969,8 @@ class ForestLevel:
 
         # Enemy / hazard movement and damage checks for level 1.
         for hazard in list(self.hazards):
-            hazard["rect"].x -= int((hazard["speed"] + self.world_speed) * dt)
+            if hazard["type"] == "gnome":
+                hazard["rect"].x -= int((hazard["speed"] + self.world_speed) * dt)
             hazard["anim_time"] = hazard.get("anim_time", 0.0) + dt
             if hazard["type"] == "gnome":
                 phase = hazard.get("bob_phase", 0.0)
@@ -806,6 +983,7 @@ class ForestLevel:
                 self.hazards.remove(hazard)
                 continue
             if player.rect.colliderect(hazard["rect"]) and player.apply_damage():
+                play_sfx("hit")
                 self.particles.append(FloatText("-1", player.rect.x, player.rect.y - 18, CRIMSON))
 
         for page in list(self.pages):
@@ -817,6 +995,7 @@ class ForestLevel:
             if visible and player.rect.colliderect(page["rect"]):
                 self.pages.remove(page)
                 self.collected += 1
+                play_sfx("page")
                 message = "Hidden page" if page["hidden"] else "Page found"
                 self.particles.append(FloatText(message, player.rect.x - 10, player.rect.y - 20, AMBER))
 
@@ -853,65 +1032,198 @@ class ForestLevel:
 
 class BunkerLevel:
     def __init__(self):
-        self.length = 2600
+        self.length = 4300
         self.reset()
+
+    def get_completed_cipher_ids(self):
+        return {cipher["id"] for cipher in self.ciphers if cipher["solved"]}
+
+    def solve_cipher(self, cipher_id):
+        cipher = next((item for item in self.ciphers if item["id"] == cipher_id), None)
+        if not cipher or cipher["solved"]:
+            return
+        cipher["solved"] = True
+        play_sfx("cipher_solve")
+        reward_text = cipher.get("reward", "")
+        self.particles.append(FloatText(f"{cipher['title']} solved", cipher["rect"].x - 18, cipher["rect"].y - 22, CYAN))
+        if reward_text:
+            self.particles.append(FloatText(reward_text, cipher["rect"].x - 60, cipher["rect"].y - 46, AMBER))
+
+    def reset_cipher_puzzle(self, puzzle_id, message=None):
+        puzzle = self.cipher_puzzles[puzzle_id]
+        if puzzle["type"] in ("sequence", "plates"):
+            puzzle["progress"] = 0
+            for node in puzzle["nodes"]:
+                node["active"] = False
+        elif puzzle["type"] == "timed_seals":
+            puzzle["timer"] = 0.0
+            for node in puzzle["nodes"]:
+                node["active"] = False
+        if message:
+            anchor = next((cipher for cipher in self.ciphers if cipher["id"] == puzzle_id), None)
+            if anchor:
+                self.particles.append(FloatText(message, anchor["rect"].x - 20, anchor["rect"].y - 20, CRIMSON))
 
     def reset(self):
         self.player = Player()
         self.player.reset_position(80, 420)
         self.player.health = 5
         self.camera_x = 0
+        self.ceiling_y = 42
         self.gravity = 1650
         self.current_gravity = 1
         self.collected = 0
-        self.target_pages = 5
+        self.target_pages = 8
         self.done = False
-        self.message = "Level 2: Use the diary lens to reveal hidden paths, dodge traps, solve ciphers."
+        self.message = "Level 2: Search the bunker, dodge creatures and traps, and decode hidden routes."
         self.particles = []
+        self.interact_cooldown = 0.0
         self.platforms = [
-            pygame.Rect(0, 520, 380, 200),
-            pygame.Rect(440, 500, 220, 24),
-            pygame.Rect(730, 450, 220, 24),
-            pygame.Rect(1020, 405, 220, 24),
-            pygame.Rect(1290, 340, 210, 24),
-            pygame.Rect(1560, 285, 180, 24),
-            pygame.Rect(1830, 340, 220, 24),
-            pygame.Rect(2085, 410, 210, 24),
-            pygame.Rect(2330, 350, 190, 24),
+            pygame.Rect(0, 520, 360, 200),
+            pygame.Rect(420, 498, 220, 24),
+            pygame.Rect(710, 452, 210, 24),
+            pygame.Rect(980, 404, 220, 24),
+            pygame.Rect(1265, 352, 200, 24),
+            pygame.Rect(1500, 292, 190, 24),
+            pygame.Rect(1765, 240, 170, 24),
+            pygame.Rect(2000, 298, 210, 24),
+            pygame.Rect(2275, 358, 220, 24),
+            pygame.Rect(2555, 420, 210, 24),
+            pygame.Rect(2815, 474, 200, 24),
+            pygame.Rect(3075, 408, 230, 24),
+            pygame.Rect(3370, 338, 210, 24),
+            pygame.Rect(3645, 272, 190, 24),
+            pygame.Rect(3905, 332, 220, 24),
+            pygame.Rect(4120, 520, 180, 200),
         ]
         self.hidden_platforms = [
-            pygame.Rect(905, 395, 90, 20),
-            pygame.Rect(1485, 230, 110, 20),
-            pygame.Rect(1680, 255, 120, 20),
-            pygame.Rect(2235, 285, 110, 20),
+            pygame.Rect(860, 392, 100, 20),
+            pygame.Rect(1450, 236, 120, 20),
+            pygame.Rect(1910, 186, 120, 20),
+            pygame.Rect(2470, 314, 120, 20),
+            pygame.Rect(3240, 360, 120, 20),
+            pygame.Rect(3760, 210, 120, 20),
         ]
         self.gravity_zones = [
-            pygame.Rect(1420, 78, 260, 190),
-            pygame.Rect(2215, 86, 150, 170),
+            pygame.Rect(1355, 82, 300, 190),
+            pygame.Rect(2350, 88, 210, 170),
+            pygame.Rect(3490, 72, 220, 180),
         ]
-        self.moving_platforms = [{
-            "rect": pygame.Rect(1600, 240, 140, 22),
-            "start": pygame.Vector2(1600, 240),
-            "end": pygame.Vector2(1760, 205),
-            "time": 0.0,
-        }]
+        self.moving_platforms = [
+            {
+                "rect": pygame.Rect(1570, 214, 140, 22),
+                "start": pygame.Vector2(1570, 214),
+                "end": pygame.Vector2(1730, 168),
+                "time": 0.0,
+            },
+            {
+                "rect": pygame.Rect(2860, 372, 150, 22),
+                "start": pygame.Vector2(2860, 372),
+                "end": pygame.Vector2(3040, 278),
+                "time": 0.8,
+            },
+            {
+                "rect": pygame.Rect(3660, 236, 150, 22),
+                "start": pygame.Vector2(3660, 236),
+                "end": pygame.Vector2(3900, 236),
+                "time": 1.9,
+            },
+        ]
         self.spikes = [
-            pygame.Rect(555, 484, 62, 16),
-            pygame.Rect(846, 434, 70, 16),
-            pygame.Rect(1368, 324, 74, 16),
-            pygame.Rect(2142, 394, 72, 16),
+            pygame.Rect(520, 482, 70, 16),
+            pygame.Rect(1320, 336, 78, 16),
+            pygame.Rect(3210, 392, 78, 16),
+        ]
+        self.energy_gates = [
+            {"rect": pygame.Rect(1105, 300, 18, 104), "time": 0.0, "cycle": 2.2, "active_window": 1.1, "phase": 0.0},
+            {"rect": pygame.Rect(3448, 182, 18, 156), "time": 0.2, "cycle": 2.4, "active_window": 0.8, "phase": 1.1},
+        ]
+        self.creatures = [
+            {"type": "crawler", "rect": pygame.Rect(470, 470, 44, 28), "left": 430, "right": 604, "speed": 86, "dir": 1, "anim": random.random(), "burn": 0.0},
+            {"type": "crawler", "rect": pygame.Rect(1010, 376, 44, 28), "left": 990, "right": 1148, "speed": 92, "dir": -1, "anim": random.random(), "burn": 0.0},
+            {"type": "crawler", "rect": pygame.Rect(1892, 212, 44, 28), "left": 1775, "right": 1928, "speed": 98, "dir": -1, "anim": random.random(), "burn": 0.0},
+            {"type": "crawler", "rect": pygame.Rect(3178, 380, 44, 28), "left": 3090, "right": 3278, "speed": 104, "dir": -1, "anim": random.random(), "burn": 0.0},
+            {"type": "wisp", "origin": pygame.Vector2(780, 360), "range": 78, "axis": "y", "speed": 2.0, "phase": 0.3, "radius": 18, "anim": random.random()},
+            {"type": "wisp", "origin": pygame.Vector2(1690, 150), "range": 96, "axis": "x", "speed": 1.7, "phase": 1.2, "radius": 18, "anim": random.random()},
+            {"type": "wisp", "origin": pygame.Vector2(3395, 256), "range": 94, "axis": "x", "speed": 1.9, "phase": 0.8, "radius": 20, "anim": random.random()},
         ]
         self.ciphers = [
-            {"id": "glow", "rect": pygame.Rect(1072, 353, 54, 52), "solved": False, "hint": "Cipher: TRUST NO GLOW"},
-            {"id": "stairs", "rect": pygame.Rect(1872, 288, 54, 52), "solved": False, "hint": "Cipher: LIGHT SHOWS STAIRS"},
+            {
+                "id": "glow",
+                "title": "Lens Cipher",
+                "rect": pygame.Rect(1060, 352, 54, 52),
+                "solved": False,
+                "hint": "Reveal the 3 lamps in left-to-right order.",
+                "reward": "Reward: stronger diary lens in the boss fight.",
+            },
+            {
+                "id": "stairs",
+                "title": "Stair Cipher",
+                "rect": pygame.Rect(1998, 248, 54, 52),
+                "solved": False,
+                "hint": "Step on the plates from low to high.",
+                "reward": "Reward: the portal charges faster in the finale.",
+            },
+            {
+                "id": "rift",
+                "title": "Seal Cipher",
+                "rect": pygame.Rect(3388, 286, 54, 52),
+                "solved": False,
+                "hint": "Reveal and seal 3 tears before the timer resets.",
+                "reward": "Reward: Bill begins the last battle weakened.",
+            },
         ]
+        self.cipher_puzzles = {
+            "glow": {
+                "type": "sequence",
+                "progress": 0,
+                "nodes": [
+                    {"rect": pygame.Rect(910, 360, 34, 34), "active": False},
+                    {"rect": pygame.Rect(984, 324, 34, 34), "active": False},
+                    {"rect": pygame.Rect(1054, 286, 34, 34), "active": False},
+                ],
+            },
+            "stairs": {
+                "type": "plates",
+                "progress": 0,
+                "order": [0, 1, 2],
+                "nodes": [
+                    {"rect": pygame.Rect(1854, 306, 68, 16), "active": False},
+                    {"rect": pygame.Rect(2010, 264, 68, 16), "active": False},
+                    {"rect": pygame.Rect(2180, 206, 68, 16), "active": False},
+                ],
+            },
+            "rift": {
+                "type": "timed_seals",
+                "timer": 0.0,
+                "duration": 6.8,
+                "nodes": [
+                    {"rect": pygame.Rect(3306, 282, 34, 34), "active": False},
+                    {"rect": pygame.Rect(3474, 236, 34, 34), "active": False},
+                    {"rect": pygame.Rect(3726, 168, 34, 34), "active": False},
+                ],
+            },
+        }
         self.pages = [
-            {"rect": pygame.Rect(790, 398, 26, 32), "hidden": False, "taken": False, "lock": None},
-            {"rect": pygame.Rect(1178, 353, 26, 32), "hidden": False, "taken": False, "lock": "glow"},
-            {"rect": pygame.Rect(1716, 206, 26, 32), "hidden": True, "taken": False, "lock": None},
-            {"rect": pygame.Rect(1888, 288, 26, 32), "hidden": False, "taken": False, "lock": None},
-            {"rect": pygame.Rect(2394, 302, 26, 32), "hidden": False, "taken": False, "lock": "stairs"},
+            {"rect": pygame.Rect(760, 400, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(1154, 352, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(1715, 166, 26, 32), "hidden": True, "taken": False, "lock": None},
+            {"rect": pygame.Rect(2094, 246, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(2592, 382, 26, 32), "hidden": True, "taken": False, "lock": None},
+            {"rect": pygame.Rect(2890, 330, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(3288, 300, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(3408, 286, 26, 32), "hidden": False, "taken": False, "lock": "rift"},
+            {"rect": pygame.Rect(3800, 160, 26, 32), "hidden": True, "taken": False, "lock": None},
         ]
+        for creature in self.creatures:
+            if creature["type"] == "wisp":
+                radius = creature["radius"]
+                creature["rect"] = pygame.Rect(
+                    round(creature["origin"].x - radius),
+                    round(creature["origin"].y - radius),
+                    radius * 2,
+                    radius * 2,
+                )
 
     def active_platforms(self):
         return list(self.platforms) + [item["rect"] for item in self.moving_platforms]
@@ -920,12 +1232,14 @@ class BunkerLevel:
         player = self.player
         player.update_common(dt)
         player.reveal_active = is_flashlight_pressed(keys) and player.reveal_energy > 0.25
+        self.interact_cooldown = max(0.0, self.interact_cooldown - dt)
+        interacting = keys[pygame.K_e] and self.interact_cooldown <= 0.0
 
-        # Player movement for level 2, including gravity flips and platform collisions.
-        in_reverse_zone = any(zone.colliderect(player.rect) for zone in self.gravity_zones)
-        self.current_gravity = -1 if in_reverse_zone else 1
+        # Player movement for level 2, including zero-gravity zones and platform collisions.
+        in_zero_gravity_zone = any(zone.colliderect(player.rect) for zone in self.gravity_zones)
+        self.current_gravity = 0 if in_zero_gravity_zone else 1
 
-        speed = 310
+        speed = 460
         move_x = 0
         if keys[pygame.K_a] or keys[pygame.K_LEFT]:
             move_x -= speed
@@ -936,15 +1250,53 @@ class BunkerLevel:
         player.set_motion_state(abs(move_x) > 0, dt)
 
         grounded = player.on_ground
-        if grounded and (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]):
-            player.vel.y = player.jump_strength * self.current_gravity
+        jumped = grounded and (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP])
+        if jumped:
+            player.vel.y = player.jump_strength
             player.on_ground = False
+            play_sfx("jump")
+
+        supporting_platform = None
+        if grounded and not jumped:
+            for platform in self.moving_platforms:
+                base_rect = platform["rect"]
+                overlap_x = player.rect.right > base_rect.left + 8 and player.rect.left < base_rect.right - 8
+                standing_on_platform = abs(player.rect.bottom - base_rect.top) <= 12
+                if overlap_x and standing_on_platform:
+                    supporting_platform = platform
+                    break
 
         for platform in self.moving_platforms:
+            old_rect = platform["rect"].copy()
             platform["time"] += dt
             blend = (math.sin(platform["time"] * 1.4) + 1) / 2
             pos = platform["start"].lerp(platform["end"], blend)
             platform["rect"].topleft = (round(pos.x), round(pos.y))
+            platform["prev_rect"] = old_rect
+            platform["delta"] = pygame.Vector2(platform["rect"].x - old_rect.x, platform["rect"].y - old_rect.y)
+
+        if supporting_platform:
+            delta = supporting_platform.get("delta", pygame.Vector2())
+            player.rect.x += round(delta.x)
+            player.rect.y += round(delta.y)
+
+        for platform in self.moving_platforms:
+            current_rect = platform["rect"]
+            prev_rect = platform.get("prev_rect", current_rect)
+            dx = round(platform.get("delta", pygame.Vector2()).x)
+            dy = round(platform.get("delta", pygame.Vector2()).y)
+            if not player.rect.colliderect(current_rect):
+                continue
+            if dy < 0 and prev_rect.top >= player.rect.bottom:
+                player.rect.bottom = current_rect.top
+                player.vel.y = min(player.vel.y, 0)
+            elif dy > 0 and prev_rect.bottom <= player.rect.top:
+                player.rect.top = current_rect.bottom
+                player.vel.y = max(player.vel.y, 0)
+            elif dx > 0 and prev_rect.right <= player.rect.left:
+                player.rect.left = current_rect.right
+            elif dx < 0 and prev_rect.left >= player.rect.right:
+                player.rect.right = current_rect.left
 
         previous = player.rect.copy()
         player.rect.x += int(move_x * dt)
@@ -957,20 +1309,28 @@ class BunkerLevel:
                     player.rect.right = platform.left
                 elif move_x < 0:
                     player.rect.left = platform.right
+        player.rect.x = clamp(player.rect.x, 20, self.length - player.rect.width - 20)
 
-        player.vel.y += self.gravity * self.current_gravity * dt
+        if self.current_gravity == 0:
+            player.vel.y *= 0.985
+        else:
+            player.vel.y += self.gravity * self.current_gravity * dt
         player.rect.y += int(player.vel.y * dt)
         player.on_ground = False
         for platform in collision_platforms:
             if player.rect.colliderect(platform):
-                if self.current_gravity > 0 and previous.bottom <= platform.top and player.vel.y >= 0:
+                if previous.bottom <= platform.top and player.vel.y >= 0:
                     player.rect.bottom = platform.top
                     player.vel.y = 0
                     player.on_ground = True
-                elif self.current_gravity < 0 and previous.top >= platform.bottom and player.vel.y <= 0:
+                elif previous.top >= platform.bottom and player.vel.y <= 0:
                     player.rect.top = platform.bottom
                     player.vel.y = 0
-                    player.on_ground = True
+
+        if player.rect.top <= self.ceiling_y:
+            player.rect.top = self.ceiling_y
+            if player.vel.y < 0:
+                player.vel.y = 0
 
         if player.rect.top > HEIGHT + 180 or player.rect.bottom < -180:
             player.health = 0
@@ -978,13 +1338,66 @@ class BunkerLevel:
         # Enemy / hazard interactions for level 2: spikes and puzzle gates.
         for spike in self.spikes:
             if player.rect.colliderect(spike) and player.apply_damage():
+                play_sfx("hit")
                 self.particles.append(FloatText("-1", player.rect.x, player.rect.y - 20, CRIMSON))
-                player.vel.y = -300 if self.current_gravity > 0 else 300
+                player.vel.y = -300
+
+        for gate in self.energy_gates:
+            gate["time"] += dt
+            active = ((gate["time"] + gate["phase"]) % gate["cycle"]) < gate["active_window"]
+            if active and player.rect.colliderect(gate["rect"]) and player.apply_damage():
+                play_sfx("hit")
+                self.particles.append(FloatText("Burn", player.rect.x, player.rect.y - 20, CRIMSON))
+                push = -340 if player.rect.centerx < gate["rect"].centerx else 340
+                player.rect.x += -20 if push < 0 else 20
+                player.vel.x = push
+
+        for creature in self.creatures:
+            creature["anim"] += dt
+            if creature["type"] == "crawler":
+                creature["rect"].x += int(creature["speed"] * creature["dir"] * dt)
+                if creature["rect"].left <= creature["left"]:
+                    creature["rect"].left = creature["left"]
+                    creature["dir"] = 1
+                elif creature["rect"].right >= creature["right"]:
+                    creature["rect"].right = creature["right"]
+                    creature["dir"] = -1
+                hit_rect = creature["rect"]
+            else:
+                axis_offset = math.sin(creature["anim"] * creature["speed"] + creature["phase"]) * creature["range"]
+                center = creature["origin"].copy()
+                if creature["axis"] == "x":
+                    center.x += axis_offset
+                else:
+                    center.y += axis_offset
+                radius = creature["radius"]
+                hit_rect = pygame.Rect(round(center.x - radius), round(center.y - radius), radius * 2, radius * 2)
+                creature["rect"] = hit_rect
+            if creature["type"] == "crawler":
+                in_front = (
+                    (player.facing > 0 and hit_rect.centerx >= player.rect.centerx - 6)
+                    or (player.facing < 0 and hit_rect.centerx <= player.rect.centerx + 6)
+                )
+                close_enough = abs(hit_rect.centery - player.rect.centery) < 110 and abs(hit_rect.centerx - player.rect.centerx) < 250
+                if player.reveal_active and in_front and close_enough:
+                    creature["burn"] = min(1.35, creature.get("burn", 0.0) + dt)
+                    if creature["burn"] >= 1.35:
+                        play_sfx("burn")
+                        self.particles.append(FloatText("Crawler burned away", hit_rect.x - 16, hit_rect.y - 24, AMBER))
+                        creature["dead"] = True
+                        continue
+                else:
+                    creature["burn"] = max(0.0, creature.get("burn", 0.0) - dt * 0.8)
+            if player.rect.colliderect(hit_rect) and player.apply_damage():
+                play_sfx("hit")
+                self.particles.append(FloatText("-1", player.rect.x, player.rect.y - 20, CRIMSON))
+                player.vel.y = -320
+        self.creatures = [creature for creature in self.creatures if not creature.get("dead")]
 
         for cipher in self.ciphers:
-            if not cipher["solved"] and player.rect.colliderect(cipher["rect"]) and player.reveal_active:
-                cipher["solved"] = True
-                self.particles.append(FloatText("Cipher solved", cipher["rect"].x, cipher["rect"].y - 20, CYAN))
+            if not cipher["solved"] and interacting and player.rect.colliderect(cipher["rect"].inflate(24, 24)):
+                self.interact_cooldown = 0.25
+                return ("cipher", cipher["id"])
 
         for page in self.pages:
             if page["taken"]:
@@ -992,27 +1405,37 @@ class BunkerLevel:
             visible = (not page["hidden"]) or player.reveal_active
             required_cipher = page.get("lock")
             locked = required_cipher and not any(cipher["id"] == required_cipher and cipher["solved"] for cipher in self.ciphers)
-            if visible and not locked and player.rect.colliderect(page["rect"]):
+            pickup_zone = player.rect.inflate(26, 28)
+            if visible and not locked and pickup_zone.colliderect(page["rect"]):
                 page["taken"] = True
                 self.collected += 1
+                play_sfx("page")
                 self.particles.append(FloatText("Decoded page", page["rect"].x, page["rect"].y - 24, AMBER))
 
         self.camera_x = clamp(player.rect.centerx - WIDTH // 2, 0, self.length - WIDTH)
         self.particles = [p for p in self.particles if p.update(dt)]
         # Level 2 completion condition: collect every page and reach the exit side.
-        if self.collected >= self.target_pages and player.rect.centerx > 2360:
+        if self.collected >= self.target_pages and player.rect.centerx > 4080:
             self.done = True
         return "lose" if player.health <= 0 else ("next" if self.done else None)
 
     def draw(self, surface, fonts, backgrounds=None):
+        bunker_layers = backgrounds.get("bunker_layers") if backgrounds else None
         bunker_bg = backgrounds.get("bunker") if backgrounds else None
-        if not draw_level_background(surface, bunker_bg, self.camera_x, self.length - WIDTH):
-            draw_bunker_background(surface, self.camera_x, self.current_gravity < 0)
+        back_bunker_layers = bunker_layers
+        front_bunker_layer = None
+        if bunker_layers and len(bunker_layers) >= 5:
+            back_bunker_layers = [layer for index, layer in enumerate(bunker_layers, start=1) if index != 5]
+            front_bunker_layer = bunker_layers[4]
+        if not draw_parallax_layers(surface, back_bunker_layers, self.camera_x, self.length - WIDTH, BUNKER_LAYER_OVERRIDES):
+            if not draw_level_background(surface, bunker_bg, self.camera_x, self.length - WIDTH):
+                draw_bunker_background(surface, self.camera_x, self.current_gravity == 0)
         for zone in self.gravity_zones:
             rect = zone.move(-self.camera_x, 0)
             glow = pygame.Surface(rect.size, pygame.SRCALPHA)
             pygame.draw.rect(glow, (110, 77, 215, 45), glow.get_rect(), border_radius=20)
             surface.blit(glow, rect.topleft)
+        bunker_tileset = backgrounds.get("bunker_tileset") if backgrounds else None
         bunker_palette = {
             "top": (104, 118, 132),
             "mid": (76, 86, 102),
@@ -1021,55 +1444,102 @@ class BunkerLevel:
             "highlight": (166, 180, 192),
             "accent": (95, 107, 123),
         }
+        ceiling_rect = pygame.Rect(0, self.ceiling_y - 34, WIDTH, 34)
+        if bunker_tileset:
+            draw_tiled_surface(surface, ceiling_rect, bunker_tileset, border_radius=0, overlay_color=(225, 225, 225, 255), border_color=(122, 132, 148))
+        else:
+            draw_stone_surface(surface, ceiling_rect, bunker_palette, self.camera_x, border_radius=0)
+        for x in range(-30, WIDTH + 80, 92):
+            px = x - (int(self.camera_x * 0.18) % 92)
+            support = [(px, self.ceiling_y), (px + 18, self.ceiling_y), (px + 9, self.ceiling_y + 18)]
+            pygame.draw.polygon(surface, (66, 74, 90), support)
         for platform in self.platforms:
-            draw_stone_surface(surface, platform.move(-self.camera_x, 0), bunker_palette, self.camera_x, border_radius=5)
+            rect = platform.move(-self.camera_x, 0)
+            if bunker_tileset:
+                draw_tiled_surface(surface, rect, bunker_tileset, border_radius=5, overlay_color=(225, 225, 225, 255), border_color=(122, 132, 148))
+            else:
+                draw_stone_surface(surface, rect, bunker_palette, self.camera_x, border_radius=5)
         for platform in self.moving_platforms:
-            draw_stone_surface(surface, platform["rect"].move(-self.camera_x, 0), bunker_palette, self.camera_x + 60, border_radius=5)
+            rect = platform["rect"].move(-self.camera_x, 0)
+            if bunker_tileset:
+                draw_tiled_surface(surface, rect, bunker_tileset, border_radius=5, overlay_color=(225, 225, 225, 255), border_color=(122, 132, 148))
+            else:
+                draw_stone_surface(surface, rect, bunker_palette, self.camera_x + 60, border_radius=5)
         for hidden in self.hidden_platforms:
             rect = hidden.move(-self.camera_x, 0)
             if self.player.reveal_active:
-                draw_stone_surface(
-                    surface,
-                    rect,
-                    {
-                        "top": (214, 226, 232),
-                        "mid": (185, 202, 210),
-                        "shadow": (137, 155, 170),
-                        "crack": (128, 148, 162),
-                        "highlight": (242, 247, 250),
-                        "accent": (178, 214, 220),
-                    },
-                    self.camera_x,
-                    border_radius=4,
-                )
+                if bunker_tileset:
+                    draw_tiled_surface(surface, rect, bunker_tileset, border_radius=4, overlay_color=(238, 242, 246, 255), border_color=(208, 224, 232))
+                else:
+                    draw_stone_surface(
+                        surface,
+                        rect,
+                        {
+                            "top": (214, 226, 232),
+                            "mid": (185, 202, 210),
+                            "shadow": (137, 155, 170),
+                            "crack": (128, 148, 162),
+                            "highlight": (242, 247, 250),
+                            "accent": (178, 214, 220),
+                        },
+                        self.camera_x,
+                        border_radius=4,
+                    )
             else:
                 pygame.draw.rect(surface, (90, 150, 150), rect, 1, border_radius=4)
         for spike in self.spikes:
             draw_spikes(surface, spike.move(-self.camera_x, 0))
+        for gate in self.energy_gates:
+            rect = gate["rect"].move(-self.camera_x, 0)
+            active = ((gate["time"] + gate["phase"]) % gate["cycle"]) < gate["active_window"]
+            draw_energy_gate(surface, rect, gate["time"], active)
+        for creature in self.creatures:
+            if creature["type"] == "crawler":
+                draw_bunker_crawler(surface, creature["rect"].move(-self.camera_x, 0), creature["anim"], creature["dir"], creature.get("burn", 0.0))
+            else:
+                rect = creature["rect"].move(-self.camera_x, 0)
+                draw_bunker_wisp(surface, rect, creature["anim"])
         for cipher in self.ciphers:
             rect = cipher["rect"].move(-self.camera_x, 0)
-            color = CYAN if cipher["solved"] else (106, 145, 176)
-            pygame.draw.rect(surface, color, rect, border_radius=8)
-            text = fonts["small"].render("#?", True, BLACK)
-            surface.blit(text, (rect.x + 12, rect.y + 12))
+            draw_cipher_marker(surface, rect, cipher["solved"])
+            title = fonts["tiny"].render(cipher["title"], True, WHITE if cipher["solved"] else MIST)
+            surface.blit(title, (rect.x - 10, rect.y - 24))
             if not cipher["solved"]:
                 hint = fonts["tiny"].render(cipher["hint"], True, MIST)
-                surface.blit(hint, (rect.x - 30, rect.y - 20))
+                surface.blit(hint, (rect.x - 110, rect.y - 52))
         for page in self.pages:
             if page["taken"]:
                 continue
             if page["hidden"] and not self.player.reveal_active:
                 continue
             draw_page(surface, page["rect"].x - self.camera_x, page["rect"].y)
+            if page.get("lock"):
+                label = fonts["tiny"].render("Solve the cipher to collect this page", True, AMBER)
+                page_x = page["rect"].x - self.camera_x + 14 - label.get_width() // 2
+                surface.blit(label, (page_x, page["rect"].y - 22))
         self.player.draw(surface, self.camera_x)
         draw_hud(surface, fonts, self.player, self.collected, self.target_pages, 2, self.message)
-        badge = fonts["small"].render("Inverted gravity" if self.current_gravity < 0 else "Normal gravity", True, WHITE)
-        surface.blit(badge, (WIDTH - 220, 88))
+        body_font = fonts.get("body", fonts["tiny"])
+        micro_font = fonts.get("micro", fonts["tiny"])
+        gravity_rect = pygame.Rect(WIDTH - 238, 116, 210, 34)
+        gravity_label = "Zero gravity" if self.current_gravity == 0 else "Normal gravity"
+        draw_note_chip(surface, gravity_rect, gravity_label, body_font, text_color=(58, 32, 18))
+        solved_count = len(self.get_completed_cipher_ids())
+        status_rect = pygame.Rect(22, 116, 260, 34)
+        draw_note_chip(surface, status_rect, f"Ciphers {solved_count}/3  |  E: interact", micro_font, text_color=(78, 46, 20), pin=True)
         for particle in self.particles:
             alpha = int(255 * clamp(particle.life / 1.4, 0, 1))
             text = fonts["small"].render(particle.text, True, particle.color)
             text.set_alpha(alpha)
             surface.blit(text, (particle.x - self.camera_x, particle.y))
+        if front_bunker_layer:
+            draw_parallax_layers(
+                surface,
+                [front_bunker_layer],
+                self.camera_x,
+                self.length - WIDTH,
+                {1: BUNKER_LAYER_OVERRIDES.get(5, {})},
+            )
 
 
 class BossLevel:
@@ -1121,7 +1591,8 @@ class BossLevel:
         self.boss_rect = pygame.Rect(self.length // 2 - 80, 145, 160, 190)
         self.boss_anchor_x = [880, self.length // 2, 2120]
         self.boss_teleport_timer = 1.9
-        self.boss_health = 12
+        self.boss_max_health = 12
+        self.boss_health = self.boss_max_health
         self.boss_fire_timer = 1.1
         self.ground_burst_timer = 6.4
         self.distortion = 0.0
@@ -1133,7 +1604,27 @@ class BossLevel:
         self.stan_ready = False
         self.stan_rect = pygame.Rect(self.length - 250, GROUND_Y - 82, 46, 82)
         self.portal_rect = pygame.Rect(self.length - 190, 420, 88, 180)
+        self.portal_charge_goal = 3.2
+        self.weak_point_life_bonus = 0.0
+        self.true_escape = False
         self.win = False
+
+    def apply_bunker_bonuses(self, solved_ciphers):
+        solved = set(solved_ciphers)
+        self.true_escape = len(solved) >= 3
+        self.player.max_reveal = max(self.player.max_reveal, 5.5)
+        if "glow" in solved:
+            self.player.max_reveal += 1.5
+            self.player.reveal_energy = self.player.max_reveal
+            self.weak_point_life_bonus = 1.2
+        if "stairs" in solved:
+            self.portal_charge_goal = 2.35
+        if "rift" in solved:
+            self.boss_max_health = 10
+            self.boss_health = min(self.boss_health, self.boss_max_health)
+        else:
+            self.boss_max_health = 12
+            self.boss_health = min(self.boss_health, self.boss_max_health)
 
     def create_dark_energy_attack(self):
         origin = pygame.Vector2(self.boss_rect.centerx, self.boss_rect.centery)
@@ -1164,6 +1655,7 @@ class BossLevel:
         attack = self.create_dark_energy_attack()
         attack["travel"] = attack["max_length"]
         self.telegraphs.append({"attack": attack, "timer": 0.42})
+        play_sfx("boss_attack")
 
     def queue_ground_burst(self):
         burst_count = random.randint(4, 6)
@@ -1202,7 +1694,7 @@ class BossLevel:
         rect = random.choice(pool).copy()
         if any(item["rect"].colliderect(rect) for item in self.weak_points):
             return
-        self.weak_points.append({"rect": rect, "life": 4.0})
+        self.weak_points.append({"rect": rect, "life": 4.0 + self.weak_point_life_bonus})
 
     def update(self, dt, keys):
         player = self.player
@@ -1221,6 +1713,7 @@ class BossLevel:
         if player.on_ground and (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]):
             player.vel.y = player.jump_strength
             player.on_ground = False
+            play_sfx("jump")
 
         previous = player.rect.copy()
         player.rect.x += int(move_x * dt)
@@ -1252,6 +1745,7 @@ class BossLevel:
                 if choices:
                     self.boss_rect.centerx = random.choice(choices)
                     self.distortion = max(self.distortion, 0.5)
+                    play_sfx("boss_teleport")
                 self.boss_teleport_timer = random.uniform(2.4, 3.8)
 
         self.camera_x = clamp(player.rect.centerx - WIDTH // 2, 0, self.length - WIDTH)
@@ -1259,7 +1753,7 @@ class BossLevel:
         self.boss_fire_timer -= dt
         if self.boss_fire_timer <= 0 and not self.stan_ready:
             self.queue_telegraphed_attack()
-            self.boss_fire_timer = 0.78 if self.boss_health > 5 else 0.52
+            self.boss_fire_timer = 0.86 if self.boss_health > 5 else 0.58
         self.ground_burst_timer -= dt
         if self.ground_burst_timer <= 0 and not self.stan_ready:
             self.queue_ground_burst()
@@ -1309,6 +1803,7 @@ class BossLevel:
                     break
             if hit:
                 if player.apply_damage():
+                    play_sfx("hit")
                     self.particles.append(FloatText("-1", player.rect.x, player.rect.y - 18, CRIMSON))
                 self.projectiles.remove(projectile)
 
@@ -1325,6 +1820,7 @@ class BossLevel:
                 self.weak_points.remove(point)
                 self.boss_health -= 1
                 self.distortion = 0.6
+                play_sfx("cipher_solve")
                 self.particles.append(FloatText("Weak point broken", point["rect"].x - 30, point["rect"].y - 20, CYAN))
 
         self.distortion = max(0.0, self.distortion - dt)
@@ -1335,7 +1831,8 @@ class BossLevel:
         close_to_portal = player.rect.colliderect(self.portal_rect.inflate(30, 30))
         if self.stan_ready and close_to_portal and keys[pygame.K_e]:
             player.portal_charge += dt
-            if player.portal_charge >= 3.2:
+            if player.portal_charge >= self.portal_charge_goal:
+                play_sfx("portal")
                 self.win = True
         else:
             player.portal_charge = max(0.0, player.portal_charge - dt * 0.75)
@@ -1401,7 +1898,7 @@ class BossLevel:
                 )
             else:
                 pygame.draw.rect(surface, (91, 145, 152), rect, 1, border_radius=6)
-        draw_portal(surface, self.portal_rect.move(-self.camera_x, 0), self.player.portal_charge / 3.2)
+        draw_portal(surface, self.portal_rect.move(-self.camera_x, 0), self.player.portal_charge / self.portal_charge_goal)
         if not self.stan_ready:
             boss_rect = self.boss_rect.move(-self.camera_x, 0)
             hover_time = pygame.time.get_ticks() * 0.001
@@ -1446,12 +1943,22 @@ class BossLevel:
             pygame.draw.circle(surface, color, center, 18, 3)
             pygame.draw.circle(surface, color, center, 6)
         self.player.draw(surface, self.camera_x)
-        draw_hud(surface, fonts, self.player, max(0, 12 - self.boss_health), 12, 3, self.message)
-        boss_text = fonts["small"].render(f"Bill's shadow: {max(0, self.boss_health)}/12", True, WHITE)
+        draw_hud(surface, fonts, self.player, max(0, self.boss_max_health - self.boss_health), self.boss_max_health, 3, self.message)
+        boss_text = fonts["small"].render(f"Bill's shadow: {max(0, self.boss_health)}/{self.boss_max_health}", True, WHITE)
         surface.blit(boss_text, (WIDTH - 240, 88))
         if self.stan_ready:
             text = fonts["small"].render("Hold E near portal to escape", True, AMBER)
             surface.blit(text, (WIDTH // 2 - text.get_width() // 2, 110))
+        bonus_parts = []
+        if self.weak_point_life_bonus > 0:
+            bonus_parts.append("Lens boost")
+        if self.portal_charge_goal < 3.2:
+            bonus_parts.append("Fast portal")
+        if self.boss_max_health < 12:
+            bonus_parts.append("Weakened Bill")
+        if bonus_parts:
+            bonus_text = fonts["tiny"].render("Cipher bonuses: " + ", ".join(bonus_parts), True, CYAN)
+            surface.blit(bonus_text, (26, 118))
         for particle in self.particles[-4:]:
             alpha = int(255 * clamp(particle.life / 1.4, 0, 1))
             text = fonts["small"].render(particle.text, True, particle.color)
@@ -1494,11 +2001,16 @@ def draw_page(surface, x, y, pulse=False):
 
 
 def draw_gnome(surface, rect):
-    pygame.draw.ellipse(surface, (194, 56, 61), rect)
-    pygame.draw.circle(surface, (240, 213, 184), (rect.x + 22, rect.y + 20), 11)
-    pygame.draw.polygon(surface, WHITE, [(rect.x + 12, rect.y + 26), (rect.x + 32, rect.y + 26), (rect.x + 22, rect.bottom)])
-    pygame.draw.circle(surface, BLACK, (rect.x + 18, rect.y + 18), 2)
-    pygame.draw.circle(surface, BLACK, (rect.x + 26, rect.y + 18), 2)
+    body = rect.inflate(-4, -4)
+    pygame.draw.ellipse(surface, (92, 120, 82), (body.x + 8, body.y + 18, body.width - 12, body.height - 18))
+    pygame.draw.polygon(surface, (178, 34, 38), [(body.x + 8, body.y + 20), (body.centerx, body.y - 8), (body.right - 2, body.y + 18)])
+    pygame.draw.circle(surface, (236, 205, 180), (body.x + 22, body.y + 24), 11)
+    pygame.draw.circle(surface, (216, 152, 122), (body.x + 27, body.y + 27), 4)
+    pygame.draw.polygon(surface, WHITE, [(body.x + 10, body.y + 30), (body.x + 34, body.y + 30), (body.x + 22, body.bottom)])
+    pygame.draw.line(surface, BLACK, (body.x + 16, body.y + 18), (body.x + 22, body.y + 16), 1)
+    pygame.draw.line(surface, BLACK, (body.x + 24, body.y + 17), (body.x + 30, body.y + 15), 1)
+    pygame.draw.circle(surface, BLACK, (body.x + 18, body.y + 21), 2)
+    pygame.draw.circle(surface, BLACK, (body.x + 26, body.y + 20), 2)
 
 
 def draw_rift(surface, rect, anim_time=0.0):
@@ -1529,23 +2041,41 @@ def draw_bunker_background(surface, camera_x, inverted):
     for y in range(120, HEIGHT, 120):
         pygame.draw.line(surface, (54, 63, 88), (0, y), (WIDTH, y), 2)
 
-    # Keep a distant lower-wall base, but place it well below the playable
-    # platform line so it does not read as solid ground across the whole level.
-    floor = pygame.Rect(0, 612, WIDTH, HEIGHT - 612)
-    draw_stone_surface(
-        surface,
-        floor,
-        {
-            "top": (78, 88, 104) if not inverted else (88, 74, 102),
-            "mid": (53, 60, 77),
-            "shadow": (26, 31, 42),
-            "crack": (71, 82, 100),
-            "highlight": (128, 139, 156),
-            "accent": (64, 74, 88),
-        },
-        camera_x,
-        border_radius=0,
-    )
+    # Make the lower area read as a hazardous maintenance shaft instead of safe floor.
+    shaft_top = 604
+    for y in range(shaft_top, HEIGHT):
+        blend = (y - shaft_top) / max(1, HEIGHT - shaft_top)
+        color = (
+            int(18 * (1 - blend) + 6 * blend),
+            int(22 * (1 - blend) + 5 * blend),
+            int(30 * (1 - blend) + 8 * blend),
+        )
+        pygame.draw.line(surface, color, (0, y), (WIDTH, y))
+
+    warning_band = pygame.Rect(0, shaft_top - 10, WIDTH, 14)
+    pygame.draw.rect(surface, (92, 78, 54), warning_band)
+    for x in range(-40, WIDTH + 80, 56):
+        px = x - (int(camera_x * 0.15) % 56)
+        stripe = [(px, shaft_top + 4), (px + 18, shaft_top + 4), (px + 4, shaft_top - 10), (px - 14, shaft_top - 10)]
+        pygame.draw.polygon(surface, (196, 164, 86), stripe)
+
+    for x in range(-30, WIDTH + 40, 84):
+        px = x - (int(camera_x * 0.22) % 84)
+        pipe_h = 26 + ((x // 84) % 3) * 12
+        pygame.draw.rect(surface, (28, 36, 48), (px, shaft_top + 18, 20, pipe_h), border_radius=4)
+        pygame.draw.rect(surface, (56, 68, 84), (px + 4, shaft_top + 18, 4, pipe_h))
+
+    for x in range(-20, WIDTH + 60, 68):
+        px = x - (int(camera_x * 0.35) % 68)
+        points = [(px, HEIGHT), (px + 14, shaft_top + 38), (px + 28, HEIGHT)]
+        pygame.draw.polygon(surface, (126, 54, 58), points)
+        pygame.draw.polygon(surface, (214, 118, 94), points, 1)
+
+    haze = pygame.Surface((WIDTH, HEIGHT - shaft_top), pygame.SRCALPHA)
+    for index in range(5):
+        ellipse = pygame.Rect(120 * index - 40, 20 + index * 18, WIDTH // 3, 54)
+        pygame.draw.ellipse(haze, (120, 36, 38, 14), ellipse)
+    surface.blit(haze, (0, shaft_top))
 
 
 def draw_spikes(surface, rect):
@@ -1554,6 +2084,167 @@ def draw_spikes(surface, rect):
     for x in range(rect.x, rect.right + 1, step):
         points.extend([(x, rect.bottom), (x + step // 2, rect.y), (x + step, rect.bottom)])
     pygame.draw.polygon(surface, (196, 102, 92), points)
+
+
+def draw_energy_gate(surface, rect, anim_time=0.0, active=True):
+    glow = pygame.Surface((rect.width + 48, rect.height + 28), pygame.SRCALPHA)
+    intensity = 0.45 + 0.55 * math.sin(anim_time * 7.0)
+    if active:
+        pygame.draw.rect(glow, (96, 230, 255, int(76 + 45 * intensity)), (22, 10, rect.width + 4, rect.height + 8), border_radius=12)
+        pygame.draw.rect(glow, (180, 255, 250, int(28 + 26 * intensity)), (16, 6, rect.width + 16, rect.height + 16), border_radius=14)
+    surface.blit(glow, (rect.x - 22, rect.y - 10))
+    frame_color = (72, 86, 106)
+    pygame.draw.rect(surface, frame_color, rect.inflate(8, 0), width=4, border_radius=8)
+    pygame.draw.rect(surface, (42, 48, 62), rect.inflate(0, 8), width=3, border_radius=8)
+    if active:
+        for step in range(5):
+            y = rect.y + 8 + step * max(1, rect.height // 5)
+            wave = math.sin(anim_time * 9.0 + step * 0.8) * 6
+            pygame.draw.line(surface, (96, 234, 255), (rect.x + 3, y), (rect.right - 3, y + wave), 3)
+        pygame.draw.rect(surface, (214, 252, 255), rect.inflate(-8, -8), width=2, border_radius=6)
+    else:
+        pygame.draw.rect(surface, (82, 88, 108), rect.inflate(-8, -8), width=2, border_radius=6)
+
+
+def draw_bunker_crawler(surface, rect, anim_time=0.0, direction=1, burn=0.0):
+    bob = math.sin(anim_time * 9.0) * 2
+    body = rect.move(0, round(bob))
+    shadow = pygame.Rect(body.x + 6, body.bottom - 4, body.width - 12, 8)
+    pygame.draw.ellipse(surface, (0, 0, 0, 60), shadow)
+    burn_t = clamp(burn / 1.35, 0, 1)
+    shell_color = (
+        int(60 * (1 - burn_t) + 144 * burn_t),
+        int(84 * (1 - burn_t) + 112 * burn_t),
+        int(78 * (1 - burn_t) + 62 * burn_t),
+    )
+    back_color = (
+        int(95 * (1 - burn_t) + 214 * burn_t),
+        int(132 * (1 - burn_t) + 176 * burn_t),
+        int(122 * (1 - burn_t) + 94 * burn_t),
+    )
+    pygame.draw.ellipse(surface, shell_color, body)
+    pygame.draw.ellipse(surface, back_color, body.inflate(-12, -10))
+    eye_x = body.centerx + (7 if direction > 0 else -7)
+    pygame.draw.circle(surface, (255, 208, 120), (eye_x, body.centery - 2), 4)
+    pygame.draw.circle(surface, BLACK, (eye_x + (1 if direction > 0 else -1), body.centery - 2), 2)
+    for index in range(4):
+        leg_x = body.x + 7 + index * 10
+        offset = math.sin(anim_time * 12 + index * 0.9) * 3
+        pygame.draw.line(surface, (42, 54, 56), (leg_x, body.bottom - 2), (leg_x - 4, body.bottom + 5 + offset), 3)
+        pygame.draw.line(surface, (42, 54, 56), (leg_x + 6, body.bottom - 2), (leg_x + 10, body.bottom + 5 - offset), 3)
+    if burn_t > 0:
+        glow = pygame.Surface((body.width + 24, body.height + 20), pygame.SRCALPHA)
+        pygame.draw.ellipse(glow, (255, 222, 148, int(26 + 42 * burn_t)), glow.get_rect())
+        surface.blit(glow, (body.x - 12, body.y - 10))
+
+
+def draw_bunker_wisp(surface, rect, anim_time=0.0):
+    glow = pygame.Surface((rect.width + 44, rect.height + 44), pygame.SRCALPHA)
+    pulse = 0.65 + 0.35 * math.sin(anim_time * 6.5)
+    pygame.draw.circle(glow, (112, 240, 255, int(38 + 32 * pulse)), glow.get_rect().center, rect.width // 2 + 18)
+    pygame.draw.circle(glow, (164, 255, 248, int(22 + 18 * pulse)), glow.get_rect().center, rect.width // 2 + 8)
+    surface.blit(glow, (rect.x - 22, rect.y - 22))
+    center = rect.center
+    pygame.draw.circle(surface, (72, 218, 236), center, rect.width // 2)
+    pygame.draw.circle(surface, (196, 255, 248), center, max(4, rect.width // 4))
+    orbit = pygame.Vector2(math.sin(anim_time * 4.6), math.cos(anim_time * 4.6)) * (rect.width * 0.28)
+    pygame.draw.circle(surface, (220, 255, 255), (round(center[0] + orbit.x), round(center[1] + orbit.y)), 3)
+
+
+def draw_cipher_lamp(surface, rect, active=False, label=1):
+    center = rect.center
+    outer_r = rect.width // 2
+    glow = pygame.Surface((rect.width + 48, rect.height + 48), pygame.SRCALPHA)
+    if active:
+        pygame.draw.circle(glow, (120, 238, 255, 62), glow.get_rect().center, outer_r + 18)
+        pygame.draw.circle(glow, (255, 220, 150, 32), glow.get_rect().center, outer_r + 10)
+    surface.blit(glow, (rect.x - 24, rect.y - 24))
+
+    pygame.draw.circle(surface, (98, 84, 70), center, outer_r)
+    pygame.draw.circle(surface, (156, 132, 102), center, outer_r - 4, 3)
+    pygame.draw.circle(surface, (56, 66, 76), center, outer_r - 10)
+    lens_color = (186, 244, 252) if active else (118, 154, 172)
+    pygame.draw.circle(surface, lens_color, center, max(8, outer_r - 18))
+    pygame.draw.circle(surface, (38, 48, 58), center, max(3, outer_r - 26))
+
+    rune_y = rect.bottom + 8
+    font = pygame.font.SysFont("consolas", 17, bold=True)
+    text = font.render(str(label), True, (66, 42, 28))
+    tag_rect = pygame.Rect(0, 0, 22, 18)
+    tag_rect.center = (rect.centerx, rune_y)
+    pygame.draw.rect(surface, (214, 194, 154), tag_rect, border_radius=5)
+    pygame.draw.rect(surface, (122, 94, 62), tag_rect, 1, border_radius=5)
+    surface.blit(text, (tag_rect.centerx - text.get_width() // 2, tag_rect.y - 1))
+
+
+def draw_cipher_plate(surface, rect, active=False, label=1):
+    base = (106, 86, 64) if active else (90, 78, 68)
+    border = (228, 214, 184) if active else (168, 152, 128)
+    glyph = (108, 220, 235) if active else (224, 212, 188)
+    shadow = rect.move(0, 4)
+    pygame.draw.rect(surface, (44, 34, 28), shadow, border_radius=8)
+    pygame.draw.rect(surface, base, rect, border_radius=8)
+    pygame.draw.rect(surface, border, rect, 2, border_radius=8)
+    inner = rect.inflate(-14, -10)
+    pygame.draw.rect(surface, (74, 58, 44), inner, border_radius=6)
+    pygame.draw.line(surface, glyph, (inner.x + 10, inner.centery), (inner.right - 10, inner.centery), 2)
+    pygame.draw.line(surface, glyph, (inner.centerx, inner.y + 5), (inner.centerx, inner.bottom - 5), 2)
+    font = pygame.font.SysFont("consolas", 17, bold=True)
+    text = font.render(str(label), True, (76, 52, 32))
+    surface.blit(text, (rect.centerx - text.get_width() // 2, rect.y - 20))
+
+
+def draw_cipher_seal(surface, rect, active=False, label=1):
+    center = rect.center
+    outer = 18
+    inner = 10
+    ring = (92, 228, 248) if active else (124, 106, 138)
+    core = (26, 30, 42)
+    wax = (154, 54, 58) if active else (104, 54, 66)
+    glow = pygame.Surface((rect.width + 48, rect.height + 48), pygame.SRCALPHA)
+    pygame.draw.circle(glow, (92, 228, 248, 46 if active else 18), glow.get_rect().center, outer + 14)
+    surface.blit(glow, (rect.x - 24, rect.y - 24))
+
+    pygame.draw.circle(surface, wax, center, outer - 2)
+    pygame.draw.circle(surface, ring, center, outer, 3)
+    pygame.draw.circle(surface, core, center, inner + 4)
+    pygame.draw.circle(surface, ring, center, inner, 2)
+    pygame.draw.line(surface, ring, (center[0] - outer + 4, center[1] - outer + 4), (center[0] + outer - 4, center[1] + outer - 4), 2)
+    pygame.draw.line(surface, ring, (center[0] + outer - 4, center[1] - outer + 4), (center[0] - outer + 4, center[1] + outer - 4), 2)
+
+    font = pygame.font.SysFont("consolas", 17, bold=True)
+    text = font.render(str(label), True, (242, 234, 220))
+    surface.blit(text, (rect.centerx - text.get_width() // 2, rect.bottom + 4))
+
+
+def draw_cipher_marker(surface, rect, solved=False):
+    shadow = rect.move(0, 4)
+    pygame.draw.rect(surface, (18, 16, 18), shadow, border_radius=10)
+
+    base = pygame.Rect(rect.x, rect.y, rect.width, rect.height)
+    if solved:
+        outer = (88, 162, 172)
+        inner = (126, 204, 208)
+        core = (210, 246, 242)
+        glyph = (24, 66, 72)
+    else:
+        outer = (108, 92, 74)
+        inner = (166, 140, 108)
+        core = (222, 202, 160)
+        glyph = (72, 48, 32)
+
+    pygame.draw.rect(surface, outer, base, border_radius=10)
+    pygame.draw.rect(surface, inner, base.inflate(-6, -6), border_radius=8)
+    pygame.draw.rect(surface, core, base.inflate(-14, -14), border_radius=6)
+    pygame.draw.rect(surface, glyph, base.inflate(-14, -14), 2, border_radius=6)
+
+    center = base.center
+    pygame.draw.circle(surface, glyph, center, 9, 2)
+    pygame.draw.line(surface, glyph, (center[0] - 12, center[1]), (center[0] + 12, center[1]), 2)
+    pygame.draw.line(surface, glyph, (center[0], center[1] - 12), (center[0], center[1] + 12), 2)
+    pygame.draw.circle(surface, glyph, (center[0] - 13, center[1] - 13), 3)
+    pygame.draw.circle(surface, glyph, (center[0] + 13, center[1] + 13), 3)
+    pygame.draw.line(surface, (248, 238, 216, 180), (base.x + 8, base.y + 8), (base.right - 10, base.y + 8), 1)
 
 
 def draw_boss_background(surface, distortion):
@@ -1681,19 +2372,66 @@ def draw_stan(surface, rect):
 
 
 def draw_hud(surface, fonts, player, collected, total, level_index, message):
-    panel = pygame.Rect(16, 14, WIDTH - 32, 82)
-    hud = pygame.Surface(panel.size, pygame.SRCALPHA)
-    pygame.draw.rect(hud, (9, 12, 18, 180), hud.get_rect(), border_radius=20)
-    surface.blit(hud, panel.topleft)
-    surface.blit(fonts["small"].render(f"Level {level_index}", True, WHITE), (30, 26))
-    surface.blit(fonts["small"].render(f"Pages / progress: {collected}/{total}", True, PAPER), (30, 52))
+    panel = pygame.Rect(16, 10, WIDTH - 32, 104)
+    draw_note_panel(surface, panel, pin_color=(160, 50, 44), alpha=214)
+    title_color = (58, 32, 18)
+    body_color = (68, 42, 24)
+    accent_color = (98, 62, 28)
+    header_font = fonts.get("body", fonts["tiny"])
+    meta_font = fonts.get("micro", fonts["tiny"])
+    surface.blit(header_font.render(f"Journal {level_index}", True, title_color), (34, 18))
+    surface.blit(header_font.render(f"Pages: {collected}/{total}", True, body_color), (34, 48))
     for i in range(player.max_health):
-        color = CRIMSON if i < player.health else (70, 46, 52)
-        pygame.draw.rect(surface, color, (280 + i * 28, 26, 20, 20), border_radius=6)
-    surface.blit(fonts["tiny"].render("Diary lens / flashlight", True, WHITE), (280, 55))
-    pygame.draw.rect(surface, (44, 59, 78), (450, 57, 180, 12), border_radius=6)
-    pygame.draw.rect(surface, AMBER, (450, 57, int(180 * player.reveal_energy / player.max_reveal), 12), border_radius=6)
-    surface.blit(fonts["tiny"].render(message, True, MIST), (660, 34))
+        color = (182, 54, 44) if i < player.health else (128, 98, 86)
+        x = 270 + i * 28
+        pygame.draw.rect(surface, color, (x, 22, 20, 20), border_radius=6)
+        pygame.draw.rect(surface, (108, 62, 44), (x, 22, 20, 20), 2, border_radius=6)
+    surface.blit(meta_font.render("Lens energy", True, accent_color), (270, 56))
+    pygame.draw.rect(surface, (126, 98, 76), (392, 57, 188, 12), border_radius=6)
+    pygame.draw.rect(surface, (214, 174, 88), (392, 57, int(188 * player.reveal_energy / player.max_reveal), 12), border_radius=6)
+    pygame.draw.rect(surface, (134, 96, 52), (392, 57, 188, 12), 2, border_radius=6)
+    message_lines = render_wrapped_lines(meta_font, message, body_color, 500)
+    text_y = 20
+    for line in message_lines[:2]:
+        surface.blit(line, (620, text_y))
+        text_y += line.get_height() + 6
+
+
+def render_wrapped_lines(font, text, color, max_width):
+    words = text.split()
+    if not words:
+        return []
+    lines = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        if font.size(candidate)[0] <= max_width:
+            current = candidate
+        else:
+            lines.append(font.render(current, True, color))
+            current = word
+    lines.append(font.render(current, True, color))
+    return lines
+
+
+def draw_note_panel(surface, rect, pin_color=(182, 48, 44), alpha=228):
+    panel = pygame.Surface(rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(panel, (228, 206, 164, alpha), panel.get_rect(), border_radius=18)
+    pygame.draw.rect(panel, (145, 104, 72, alpha), panel.get_rect(), 3, border_radius=18)
+    inner = panel.get_rect().inflate(-14, -14)
+    pygame.draw.rect(panel, (242, 226, 192, 70), inner, 1, border_radius=14)
+    for x in range(16, rect.width - 16, 34):
+        pygame.draw.line(panel, (255, 244, 220, 18), (x, 14), (x + 12, rect.height - 14), 1)
+    for px, py in ((18, 18), (rect.width - 28, 18), (26, rect.height - 24)):
+        pygame.draw.circle(panel, pin_color + (alpha,), (px, py), 5)
+        pygame.draw.circle(panel, (255, 224, 176, alpha), (px - 1, py - 1), 2)
+    surface.blit(panel, rect.topleft)
+
+
+def draw_note_chip(surface, rect, text, font, text_color=(86, 56, 34), pin=False):
+    draw_note_panel(surface, rect, pin_color=(160, 50, 44) if pin else (148, 94, 62), alpha=216)
+    rendered = font.render(text, True, text_color)
+    surface.blit(rendered, (rect.centerx - rendered.get_width() // 2, rect.centery - rendered.get_height() // 2))
 
 
 class Game:
@@ -1709,9 +2447,17 @@ class Game:
         self.clock = pygame.time.Clock()
         self.asset_paths = {
             "menu_background": first_existing(os.path.join(IMAGES_DIR, "menu_background.png"), os.path.join(IMAGES_DIR, "menu_background.jpg")),
+            "menu_logo": first_existing(
+                os.path.join(IMAGES_DIR, "menu_logo.png"),
+                os.path.join(IMAGES_DIR, "menu_logo.jpg"),
+                os.path.join(IMAGES_DIR, "logo.png"),
+                os.path.join(IMAGES_DIR, "logo.jpg"),
+            ),
             "settings_background": first_existing(os.path.join(IMAGES_DIR, "settings_background.png"), os.path.join(IMAGES_DIR, "settings_background.jpg")),
+            "cipher_background": first_existing(os.path.join(IMAGES_DIR, "cipher_background.png"), os.path.join(IMAGES_DIR, "cipher_background.jpg")),
             "forest_background": first_existing(os.path.join(IMAGES_DIR, "forest_background.png"), os.path.join(IMAGES_DIR, "forest_background.jpg")),
             "bunker_background": first_existing(os.path.join(IMAGES_DIR, "bunker_background.png"), os.path.join(IMAGES_DIR, "bunker_background.jpg")),
+            "bunker_tileset": first_existing(os.path.join(IMAGES_DIR, "bunker_tileset.png"), os.path.join(IMAGES_DIR, "bunker_tileset.jpg")),
             "boss_background": first_existing(os.path.join(IMAGES_DIR, "boss_background.png"), os.path.join(IMAGES_DIR, "boss_background.jpg")),
             "button": first_existing(os.path.join(IMAGES_DIR, "button.png"), os.path.join(IMAGES_DIR, "button_idle.png")),
             "button_hover": first_existing(os.path.join(IMAGES_DIR, "button_hover.png"), os.path.join(IMAGES_DIR, "button_active.png")),
@@ -1757,10 +2503,17 @@ class Game:
             "title": load_font(self.asset_paths["font_title"], 44, "georgia", bold=True),
             "small": load_font(self.asset_paths["font_ui"], 44, "georgia", bold=True),
             "tiny": load_font(self.asset_paths["font_mono"], 28, "consolas"),
+            "body": load_font(self.asset_paths["font_ui"], 24, "georgia", bold=True),
+            "micro": load_font(self.asset_paths["font_mono"], 18, "consolas"),
         }
         self.level_factories = [ForestLevel, BunkerLevel, BossLevel]
         self.state = "menu"
         self.levels = self.build_levels()
+        self.bunker_bonuses = set()
+        self.true_ending = False
+        self.active_cipher_id = None
+        self.cipher_modal_message = ""
+        self.cipher_modal_message_timer = 0.0
         self.level_index = self.load_progress()
         self.banner_timer = 4.0
         self.overlay_text = f"Level {self.level_index + 1}"
@@ -1782,16 +2535,21 @@ class Game:
             "difficulty_left": pygame.Rect(0, 0, 52, 46),
             "difficulty_value": pygame.Rect(0, 0, 236, 46),
             "difficulty_right": pygame.Rect(0, 0, 52, 46),
+            "main_menu": pygame.Rect(0, 0, 360, 46),
         }
         self.ui_images = {
             "menu_background": load_scaled_image(self.asset_paths["menu_background"], (WIDTH, HEIGHT)),
+            "menu_logo": trim_transparent_bounds(load_image(self.asset_paths["menu_logo"])),
             "settings_background": load_scaled_image(self.asset_paths["settings_background"], (WIDTH, HEIGHT)),
+            "cipher_background": load_image(self.asset_paths["cipher_background"]),
         }
         self.level_backgrounds = {
             "forest": load_image(self.asset_paths["forest_background"]),
             "bunker": load_image(self.asset_paths["bunker_background"]),
+            "bunker_tileset": load_image(self.asset_paths["bunker_tileset"]),
             "boss": load_image(self.asset_paths["boss_background"]),
             "forest_layers": load_parallax_layers("forest", 12),
+            "bunker_layers": load_parallax_layers("bunker", 12),
         }
         Player.set_sprites(
             load_image(self.asset_paths["player_idle"]),
@@ -1836,11 +2594,18 @@ class Game:
             "music_toggle_off_hover": load_image(self.asset_paths["music_toggle_off_hover"]) or load_image(self.asset_paths["music_toggle_off"]),
         }
         self.rebuild_settings_layout()
+        self.load_sfx()
         self.start_music()
         self.apply_difficulty()
+        self.apply_bunker_bonuses_to_levels()
 
     def build_levels(self):
         return [factory() for factory in self.level_factories]
+
+    def apply_bunker_bonuses_to_levels(self):
+        for level in self.levels:
+            if isinstance(level, BossLevel):
+                level.apply_bunker_bonuses(self.bunker_bonuses)
 
     def load_progress(self):
         try:
@@ -1878,6 +2643,24 @@ class Game:
         except pygame.error:
             self.music_enabled = False
 
+    def load_sfx(self):
+        global SFX_SOUNDS
+        if not pygame.mixer.get_init():
+            SFX_SOUNDS = {}
+            return
+        SFX_SOUNDS = {
+            "jump": load_sfx_sound("jump", 0.4),
+            "page": load_sfx_sound("page", 0.42),
+            "hit": load_sfx_sound("hit", 0.48),
+            "cipher_open": load_sfx_sound("cipher_open", 0.45),
+            "cipher_solve": load_sfx_sound("cipher_solve", 0.48),
+            "burn": load_sfx_sound("burn", 0.4),
+            "boss_teleport": load_sfx_sound("boss_teleport", 0.46),
+            "boss_attack": load_sfx_sound("boss_attack", 0.4),
+            "portal": load_sfx_sound("portal", 0.5),
+            "menu": load_sfx_sound("menu", 0.32),
+        }
+
     def set_volume_from_pos(self, mouse_x):
         left, right = self.get_slider_inner_bounds()
         self.volume = clamp((mouse_x - left) / max(1, right - left), 0.0, 1.0)
@@ -1891,7 +2674,7 @@ class Game:
         content_width = content_right - content_left
         content_top = area.y + 62
         content_bottom = area.bottom - 12
-        section_gap = 18
+        section_gap = 12
 
         fullscreen_label_w = max(
             self.fonts["small"].size("Fullscreen: On")[0],
@@ -1916,14 +2699,24 @@ class Game:
         self.settings_buttons["difficulty_value"] = pygame.Rect(diff_value_x, difficulty_y, diff_value_w, arrow_h)
         self.settings_buttons["difficulty_right"] = pygame.Rect(content_right - arrow_w, difficulty_y, arrow_w, arrow_h)
 
-        music_size = self.get_music_toggle_reference_size()
-        if music_size:
-            music_w, music_h = fit_size(music_size, (250, 116))
+        menu_button_y = difficulty_y + arrow_h + section_gap
+        if self.button_images["idle"]:
+            menu_w, menu_h = fit_size(self.button_images["idle"].get_size(), (content_width, 104))
         else:
-            music_w, music_h = 250, 96
+            menu_w, menu_h = content_width, 58
+        menu_x = content_left + max(0, (content_width - menu_w) // 2)
+        self.settings_buttons["main_menu"] = pygame.Rect(menu_x, menu_button_y, menu_w, menu_h)
 
+        music_size = self.get_music_toggle_reference_size()
         slider_gap = 10
-        slider_label_gap = 42
+        slider_label_gap = 36
+        music_row_top = self.settings_buttons["main_menu"].bottom + 18
+        available_group_height = max(86, content_bottom - music_row_top)
+        music_max_h = int(clamp(available_group_height, 86, 116))
+        if music_size:
+            music_w, music_h = fit_size(music_size, (250, music_max_h))
+        else:
+            music_w, music_h = 250, min(96, music_max_h)
         slider_w = max(150, content_width - music_w - slider_gap)
         slider_bar_image = crop_visible_bounds(self.settings_images["slider_bar"])
         if slider_bar_image:
@@ -1933,12 +2726,11 @@ class Game:
             slider_h = 22
 
         slider_total_h = slider_h + slider_label_gap
-        bottom_group_h = max(music_h, slider_total_h)
-        bottom_y = content_bottom - bottom_group_h
+        bottom_group_h = min(max(music_h, slider_total_h), available_group_height)
         combined_w = music_w + slider_gap + slider_w
         bottom_left = content_left + max(0, (content_width - combined_w) // 2)
-        music_y = bottom_y + (bottom_group_h - music_h) // 2
-        slider_y = bottom_y + slider_label_gap
+        music_y = music_row_top + max(0, (bottom_group_h - music_h) // 2)
+        slider_y = music_row_top + slider_label_gap
         self.settings_buttons["music"] = pygame.Rect(bottom_left, music_y, music_w, music_h)
         self.volume_slider_rect = pygame.Rect(bottom_left + music_w + slider_gap, slider_y, slider_w, slider_h)
 
@@ -1992,6 +2784,7 @@ class Game:
         if not pygame.mixer.get_init():
             self.music_enabled = False
             return
+        play_sfx("menu")
         self.music_enabled = not self.music_enabled
         if self.music_enabled:
             self.start_music()
@@ -1999,6 +2792,7 @@ class Game:
             pygame.mixer.music.stop()
 
     def toggle_fullscreen(self):
+        play_sfx("menu")
         self.fullscreen = not self.fullscreen
         flags = pygame.FULLSCREEN if self.fullscreen else 0
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
@@ -2012,9 +2806,16 @@ class Game:
             2: {"health": 4, "reveal": 4.7, "forest_spawn_scale": 0.86},
         }
         self.apply_difficulty_to_level(self.levels[target_index], settings[self.difficulty_index])
+        if isinstance(self.levels[target_index], BossLevel):
+            self.levels[target_index].apply_bunker_bonuses(self.bunker_bonuses)
 
     def restart_all(self, clear_save=True):
         self.levels = self.build_levels()
+        self.bunker_bonuses = set()
+        self.true_ending = False
+        self.active_cipher_id = None
+        self.cipher_modal_message = ""
+        self.cipher_modal_message_timer = 0.0
         self.level_index = 0
         self.state = "menu"
         self.overlay_text = "Level 1"
@@ -2023,6 +2824,7 @@ class Game:
         self.death_message = ""
         self.settings_return_state = "menu"
         self.apply_difficulty()
+        self.apply_bunker_bonuses_to_levels()
         if clear_save:
             self.clear_progress()
 
@@ -2039,8 +2841,14 @@ class Game:
 
     def start_new_game(self):
         self.levels = self.build_levels()
+        self.bunker_bonuses = set()
+        self.true_ending = False
+        self.active_cipher_id = None
+        self.cipher_modal_message = ""
+        self.cipher_modal_message_timer = 0.0
         self.level_index = 0
         self.apply_difficulty()
+        self.apply_bunker_bonuses_to_levels()
         self.clear_progress()
         self.state = "playing"
         self.overlay_text = "Level 1"
@@ -2052,7 +2860,13 @@ class Game:
     def continue_game(self):
         self.level_index = self.load_progress()
         self.levels = self.build_levels()
+        self.bunker_bonuses = set()
+        self.true_ending = False
+        self.active_cipher_id = None
+        self.cipher_modal_message = ""
+        self.cipher_modal_message_timer = 0.0
         self.apply_difficulty()
+        self.apply_bunker_bonuses_to_levels()
         self.state = "playing"
         self.overlay_text = f"Level {self.level_index + 1}"
         self.banner_timer = 3.0
@@ -2070,10 +2884,12 @@ class Game:
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         overlay.fill((8, 10, 18, 190))
         self.screen.blit(overlay, (0, 0))
-        title = self.fonts["title"].render("You Died", True, CRIMSON)
-        self.screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 240))
-        subtitle = self.fonts["small"].render(self.death_message, True, WHITE)
-        self.screen.blit(subtitle, (WIDTH // 2 - subtitle.get_width() // 2, 320))
+        panel = pygame.Rect(WIDTH // 2 - 320, 180, 640, 220)
+        draw_note_panel(self.screen, panel, pin_color=(134, 34, 30), alpha=224)
+        title = self.fonts["title"].render("You Died", True, (116, 34, 26))
+        self.screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 34))
+        subtitle = self.fonts["small"].render(self.death_message, True, (88, 60, 40))
+        self.screen.blit(subtitle, (panel.centerx - subtitle.get_width() // 2, panel.y + 118))
 
     @property
     def current_level(self):
@@ -2197,6 +3013,8 @@ class Game:
                 image = self.settings_images["music_toggle_on_hover"] if hovered else self.settings_images["music_toggle_on"]
             else:
                 image = self.settings_images["music_toggle_off_hover"] if hovered else self.settings_images["music_toggle_off"]
+        elif key == "main_menu":
+            image = self.button_images["hover"] if hovered else self.button_images["idle"]
         elif key == "fullscreen":
             image = self.fullscreen_button_images["hover"] if hovered else self.fullscreen_button_images["idle"]
         elif key == "difficulty_left":
@@ -2237,6 +3055,25 @@ class Game:
             self.screen.blit(surface, draw_rect.topleft)
         else:
             self.draw_settings_row(rect, f"Music: {'On' if self.music_enabled else 'Off'}", self.music_enabled)
+
+    def draw_settings_main_menu_button(self, rect):
+        hovered = self.is_point_on_settings_button("main_menu", pygame.mouse.get_pos())
+        if self.button_images["idle"]:
+            surface, draw_rect = self.get_settings_button_surface_and_rect("main_menu", hovered=hovered)
+            self.screen.blit(surface, draw_rect.topleft)
+            bounds = surface.get_bounding_rect(min_alpha=20)
+            center_x = draw_rect.x + bounds.centerx
+            center_y = draw_rect.y + bounds.centery - 1
+            text_color = (93, 49, 24) if hovered else (71, 39, 20)
+            outline_color = (250, 240, 220)
+            label = "Main Menu"
+            text = self.fonts["small"].render(label, True, text_color)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                outline = self.fonts["small"].render(label, True, outline_color)
+                self.screen.blit(outline, (center_x - outline.get_width() // 2 + dx, center_y - outline.get_height() // 2 + dy))
+            self.screen.blit(text, (center_x - text.get_width() // 2, center_y - text.get_height() // 2))
+        else:
+            self.draw_settings_row(rect, "Main Menu", False)
 
     def draw_settings_slider(self):
         slider_label = self.fonts["small"].render("Volume", True, WHITE)
@@ -2323,12 +3160,23 @@ class Game:
             label = self.fonts["small"].render(button["label"], True, text_color)
             self.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
 
+    def draw_menu_logo(self):
+        logo = self.ui_images["menu_logo"]
+        if not logo:
+            return
+        area = pygame.Rect(62, 42, 540, 220)
+        draw_size = fit_size(logo.get_size(), area.size)
+        scaled = pygame.transform.smoothscale(logo, draw_size)
+        draw_rect = scaled.get_rect(center=area.center)
+        self.screen.blit(scaled, draw_rect.topleft)
+
     # --- MAIN MENU ---
     def draw_menu(self):
         if self.ui_images["menu_background"]:
             self.screen.blit(self.ui_images["menu_background"], (0, 0))
         else:
             draw_forest_background(self.screen, 0)
+        self.draw_menu_logo()
         mouse_pos = pygame.mouse.get_pos()
         self.build_menu_buttons()
         for key in ("play", "continue", "settings", "exit"):
@@ -2340,10 +3188,12 @@ class Game:
         overlay.fill((8, 10, 18, 178))
         self.screen.blit(overlay, (0, 0))
 
-        title = self.fonts["title"].render("Paused", True, WHITE)
-        subtitle = self.fonts["small"].render("Esc to continue", True, PAPER)
-        self.screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 150))
-        self.screen.blit(subtitle, (WIDTH // 2 - subtitle.get_width() // 2, 208))
+        card = pygame.Rect(WIDTH // 2 - 240, 118, 480, 138)
+        draw_note_panel(self.screen, card, pin_color=(156, 54, 44), alpha=222)
+        title = self.fonts["title"].render("Paused", True, (82, 50, 30))
+        subtitle = self.fonts["small"].render("Esc to continue", True, (102, 72, 46))
+        self.screen.blit(title, (card.centerx - title.get_width() // 2, card.y + 20))
+        self.screen.blit(subtitle, (card.centerx - subtitle.get_width() // 2, card.y + 78))
 
         mouse_pos = pygame.mouse.get_pos()
         self.build_pause_buttons()
@@ -2367,6 +3217,7 @@ class Game:
 
         self.draw_music_toggle_button(music_rect)
         self.draw_fullscreen_button(fullscreen_rect)
+        self.draw_settings_main_menu_button(self.settings_buttons["main_menu"])
 
         self.blit_or_fallback_rect(self.settings_images["difficulty"], diff_value, (36, 42, 58), (109, 127, 148), border_radius=12)
         diff_text = self.fonts["small"].render(f"Difficulty: {self.difficulty_options[self.difficulty_index]}", True, WHITE)
@@ -2397,6 +3248,7 @@ class Game:
                 buttons = self.build_menu_buttons()
         for key in buttons:
             if self.is_point_on_button_texture(key, mouse_pos, state):
+                play_sfx("menu")
                 if state == "paused":
                     if key == "continue":
                         self.state = "playing"
@@ -2433,12 +3285,20 @@ class Game:
         if self.is_point_on_settings_button("fullscreen", mouse_pos):
             self.toggle_fullscreen()
             return
+        if self.is_point_on_settings_button("main_menu", mouse_pos):
+            self.dragging_volume = False
+            play_sfx("menu")
+            self.state = "menu"
+            self.settings_return_state = "menu"
+            return
         if self.is_point_on_settings_button("difficulty_left", mouse_pos):
+            play_sfx("menu")
             self.difficulty_index = (self.difficulty_index - 1) % len(self.difficulty_options)
             self.restart_all()
             self.state = "settings"
             return
         if self.is_point_on_settings_button("difficulty_right", mouse_pos):
+            play_sfx("menu")
             self.difficulty_index = (self.difficulty_index + 1) % len(self.difficulty_options)
             self.restart_all()
             self.state = "settings"
@@ -2451,16 +3311,200 @@ class Game:
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         overlay.fill((8, 10, 18, 180))
         self.screen.blit(overlay, (0, 0))
-        heading = "The diary is decoded. The twins escape." if victory else "The bunker wins this round."
-        color = AMBER if victory else CRIMSON
+        if victory and self.true_ending:
+            heading = "True ending: the bunker is sealed for good."
+        else:
+            heading = "The diary is decoded. The twins escape." if victory else "The bunker wins this round."
+        panel = pygame.Rect(WIDTH // 2 - 420, 150, 840, 360)
+        draw_note_panel(self.screen, panel, pin_color=(152, 52, 42), alpha=226)
+        color = (154, 104, 44) if victory else (126, 38, 32)
         title = self.fonts["title"].render(heading, True, color)
-        self.screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 210))
+        self.screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 34))
         lines = ["Press R to restart the whole adventure.", "Press Esc to close the game."]
         if victory:
-            lines.insert(0, "Stan opens the tear, the portal stabilizes, and Bill's shadow fades.")
+            if self.true_ending:
+                lines.insert(0, "All three bunker ciphers were solved. The diary reveals how to seal the tear behind them.")
+                lines.insert(1, "Stan stabilizes the portal, Dipper locks the breach, and Bill's shadow cannot return.")
+            else:
+                lines.insert(0, "Stan opens the tear, the portal stabilizes, and Bill's shadow fades.")
         for i, line in enumerate(lines):
-            text = self.fonts["small"].render(line, True, WHITE)
-            self.screen.blit(text, (WIDTH // 2 - text.get_width() // 2, 320 + i * 42))
+            text = self.fonts["small"].render(line, True, (88, 60, 40))
+            self.screen.blit(text, (panel.centerx - text.get_width() // 2, panel.y + 138 + i * 46))
+
+    def open_cipher_puzzle(self, cipher_id):
+        if not isinstance(self.current_level, BunkerLevel):
+            return
+        cipher = next((item for item in self.current_level.ciphers if item["id"] == cipher_id), None)
+        if not cipher or cipher["solved"]:
+            return
+        puzzle = self.current_level.cipher_puzzles[cipher_id]
+        self.current_level.reset_cipher_puzzle(cipher_id)
+        if puzzle["type"] == "timed_seals":
+            puzzle["timer"] = puzzle["duration"]
+        self.active_cipher_id = cipher_id
+        self.cipher_modal_message = "Solve the cipher. Esc closes the puzzle."
+        self.cipher_modal_message_timer = 0.0
+        self.state = "cipher_puzzle"
+        play_sfx("cipher_open")
+
+    def close_cipher_puzzle(self):
+        if isinstance(self.current_level, BunkerLevel):
+            self.current_level.player.invuln = max(self.current_level.player.invuln, 2.0)
+        self.active_cipher_id = None
+        self.cipher_modal_message = ""
+        self.cipher_modal_message_timer = 0.0
+        self.state = "playing"
+
+    def get_cipher_modal_nodes(self, cipher_id, panel):
+        if cipher_id == "glow":
+            size = 52
+            gap = 44
+            start_x = panel.centerx - (size * 3 + gap * 2) // 2
+            y = panel.y + 158
+            return [pygame.Rect(start_x + index * (size + gap), y, size, size) for index in range(3)]
+        if cipher_id == "stairs":
+            width, height = 118, 28
+            return [
+                pygame.Rect(panel.x + 86, panel.bottom - 132, width, height),
+                pygame.Rect(panel.centerx - width // 2, panel.bottom - 192, width, height),
+                pygame.Rect(panel.right - 86 - width, panel.bottom - 252, width, height),
+            ]
+        size = 58
+        return [
+            pygame.Rect(panel.centerx - size // 2, panel.y + 138, size, size),
+            pygame.Rect(panel.x + 126, panel.bottom - 164, size, size),
+            pygame.Rect(panel.right - 126 - size, panel.bottom - 164, size, size),
+        ]
+
+    def update_cipher_puzzle(self, dt):
+        if self.cipher_modal_message_timer > 0:
+            self.cipher_modal_message_timer = max(0.0, self.cipher_modal_message_timer - dt)
+        if not isinstance(self.current_level, BunkerLevel) or not self.active_cipher_id:
+            return
+        puzzle = self.current_level.cipher_puzzles[self.active_cipher_id]
+        if puzzle["type"] == "timed_seals" and not any(cipher["id"] == self.active_cipher_id and cipher["solved"] for cipher in self.current_level.ciphers):
+            puzzle["timer"] = max(0.0, puzzle["timer"] - dt)
+            if puzzle["timer"] <= 0:
+                self.current_level.reset_cipher_puzzle(self.active_cipher_id)
+                puzzle["timer"] = puzzle["duration"]
+                self.cipher_modal_message = "The seals collapsed. Try again."
+                self.cipher_modal_message_timer = 1.8
+
+    def handle_cipher_puzzle_click(self, mouse_pos):
+        if not isinstance(self.current_level, BunkerLevel) or not self.active_cipher_id:
+            return
+        cipher = next(item for item in self.current_level.ciphers if item["id"] == self.active_cipher_id)
+        puzzle = self.current_level.cipher_puzzles[self.active_cipher_id]
+        panel = pygame.Rect(WIDTH // 2 - 330, HEIGHT // 2 - 220, 660, 440)
+        node_rects = self.get_cipher_modal_nodes(self.active_cipher_id, panel)
+        clicked_index = next((index for index, rect in enumerate(node_rects) if rect.collidepoint(mouse_pos)), None)
+        if clicked_index is None:
+            return
+
+        if puzzle["type"] in ("sequence", "plates"):
+            if clicked_index == puzzle["progress"]:
+                puzzle["nodes"][clicked_index]["active"] = True
+                puzzle["progress"] += 1
+                self.cipher_modal_message = "Correct."
+                self.cipher_modal_message_timer = 0.7
+                if puzzle["progress"] >= len(puzzle["nodes"]):
+                    self.current_level.solve_cipher(self.active_cipher_id)
+                    self.close_cipher_puzzle()
+            else:
+                self.current_level.reset_cipher_puzzle(self.active_cipher_id)
+                self.cipher_modal_message = "Wrong order. Reset."
+                self.cipher_modal_message_timer = 1.1
+        elif puzzle["type"] == "timed_seals":
+            if not puzzle["nodes"][clicked_index]["active"]:
+                puzzle["nodes"][clicked_index]["active"] = True
+                self.cipher_modal_message = "Seal locked."
+                self.cipher_modal_message_timer = 0.7
+                if all(node["active"] for node in puzzle["nodes"]):
+                    self.current_level.solve_cipher(self.active_cipher_id)
+                    self.close_cipher_puzzle()
+
+    def draw_cipher_puzzle(self):
+        if not isinstance(self.current_level, BunkerLevel) or not self.active_cipher_id:
+            return
+        cipher = next(item for item in self.current_level.ciphers if item["id"] == self.active_cipher_id)
+        puzzle = self.current_level.cipher_puzzles[self.active_cipher_id]
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((8, 10, 18, 192))
+        self.screen.blit(overlay, (0, 0))
+        panel = pygame.Rect(WIDTH // 2 - 330, HEIGHT // 2 - 220, 660, 440)
+        cipher_bg = self.ui_images.get("cipher_background")
+        if cipher_bg:
+            scaled = pygame.transform.smoothscale(cipher_bg, panel.size)
+            self.screen.blit(scaled, panel.topleft)
+        else:
+            pygame.draw.rect(self.screen, (20, 24, 34), panel, border_radius=22)
+            pygame.draw.rect(self.screen, (182, 200, 214), panel, 3, border_radius=22)
+
+        text_left = panel.x + 42
+        text_right = panel.right - 42
+        text_width = text_right - text_left
+        title_font = load_font(self.asset_paths["font_title"], 28, "georgia", bold=True)
+        hint_font = load_font(self.asset_paths["font_ui"], 21, "georgia", bold=True)
+        reward_font = load_font(self.asset_paths["font_mono"], 15, "consolas")
+        footer_font = load_font(self.asset_paths["font_mono"], 14, "consolas")
+
+        title_color = (245, 241, 232)
+        hint_color = (247, 243, 228)
+        reward_color = (223, 186, 106)
+        shadow_color = (34, 22, 18)
+
+        def blit_center_text(rendered, center_x, y, shadow_offset=2):
+            shadow = rendered.copy()
+            shadow.fill(shadow_color + (255,), special_flags=pygame.BLEND_RGBA_MULT)
+            shadow.set_alpha(210)
+            self.screen.blit(shadow, (center_x - shadow.get_width() // 2 + shadow_offset, y + shadow_offset))
+            self.screen.blit(rendered, (center_x - rendered.get_width() // 2, y))
+
+        title = title_font.render(cipher["title"], True, title_color)
+        blit_center_text(title, panel.centerx, panel.y + 22)
+
+        hint_lines = render_wrapped_lines(hint_font, cipher["hint"], hint_color, text_width - 28)
+        reward_text = cipher["reward"].replace("Reward:", "Reward")
+        reward_lines = render_wrapped_lines(reward_font, reward_text, reward_color, text_width - 90)
+
+        text_y = panel.y + 86
+        for line in hint_lines:
+            blit_center_text(line, panel.centerx, text_y, shadow_offset=1)
+            text_y += line.get_height() + 6
+
+        reward_y = min(text_y + 8, panel.y + 140)
+        reward_chip = pygame.Rect(panel.x + 86, reward_y - 4, panel.width - 172, 32)
+        chip = pygame.Surface(reward_chip.size, pygame.SRCALPHA)
+        pygame.draw.rect(chip, (28, 18, 14, 112), chip.get_rect(), border_radius=14)
+        pygame.draw.rect(chip, (180, 132, 78, 120), chip.get_rect(), 1, border_radius=14)
+        self.screen.blit(chip, reward_chip.topleft)
+        reward_line = reward_lines[0] if reward_lines else reward_font.render(reward_text, True, reward_color)
+        blit_center_text(reward_line, reward_chip.centerx, reward_chip.y + 7, shadow_offset=1)
+
+        node_rects = self.get_cipher_modal_nodes(self.active_cipher_id, panel)
+        if puzzle["type"] == "sequence":
+            for index, rect in enumerate(node_rects):
+                draw_cipher_lamp(self.screen, rect, puzzle["nodes"][index]["active"], index + 1)
+        elif puzzle["type"] == "plates":
+            for index, rect in enumerate(node_rects):
+                draw_cipher_plate(self.screen, rect, puzzle["nodes"][index]["active"], index + 1)
+            helper = self.fonts["tiny"].render("Click the plates from the lowest stair to the highest.", True, CYAN)
+            self.screen.blit(helper, (panel.centerx - helper.get_width() // 2, panel.bottom - 94))
+        elif puzzle["type"] == "timed_seals":
+            for index, rect in enumerate(node_rects):
+                draw_cipher_seal(self.screen, rect, puzzle["nodes"][index]["active"], index + 1)
+            timer = hint_font.render(f"Seal timer: {puzzle['timer']:.1f}s", True, CYAN)
+            helper = footer_font.render("Seal all three tears before the timer resets.", True, CYAN)
+            blit_center_text(timer, panel.centerx, panel.bottom - 140, shadow_offset=1)
+            blit_center_text(helper, panel.centerx, panel.bottom - 108, shadow_offset=1)
+
+        if self.cipher_modal_message:
+            color = AMBER if "Correct" in self.cipher_modal_message or "locked" in self.cipher_modal_message.lower() else CRIMSON if "Wrong" in self.cipher_modal_message or "collapsed" in self.cipher_modal_message.lower() else WHITE
+            message = hint_font.render(self.cipher_modal_message, True, color)
+            blit_center_text(message, panel.centerx, panel.bottom - 66, shadow_offset=1)
+
+        close_hint = footer_font.render("Esc to return to the bunker", True, MIST)
+        blit_center_text(close_hint, panel.centerx, panel.bottom - 34, shadow_offset=1)
 
     def draw_film_overlay(self):
         tick = pygame.time.get_ticks()
@@ -2490,17 +3534,23 @@ class Game:
 
     def handle_result(self, result):
         if result == "next":
+            if isinstance(self.current_level, BunkerLevel):
+                self.bunker_bonuses = self.current_level.get_completed_cipher_ids()
             self.level_index += 1
             if self.level_index >= len(self.levels):
                 self.clear_progress()
                 self.state = "victory"
             else:
+                if isinstance(self.levels[self.level_index], BossLevel):
+                    self.levels[self.level_index].apply_bunker_bonuses(self.bunker_bonuses)
                 self.save_progress()
                 self.banner_timer = 3.0
                 self.overlay_text = f"Level {self.level_index + 1}"
         elif result == "lose":
             self.start_death_restart()
         elif result == "win":
+            if isinstance(self.current_level, BossLevel):
+                self.true_ending = self.current_level.true_escape
             self.clear_progress()
             self.state = "victory"
 
@@ -2509,9 +3559,12 @@ class Game:
             return
         alpha = int(255 * min(1.0, self.banner_timer))
         text = self.overlay_text or f"Level {self.level_index + 1}"
-        banner = self.fonts["title"].render(text, True, WHITE)
+        card = pygame.Surface((420, 88), pygame.SRCALPHA)
+        draw_note_panel(card, card.get_rect(), pin_color=(152, 52, 42), alpha=min(220, alpha))
+        self.screen.blit(card, (WIDTH // 2 - 210, 118))
+        banner = self.fonts["title"].render(text, True, (84, 52, 32))
         banner.set_alpha(alpha)
-        self.screen.blit(banner, (WIDTH // 2 - banner.get_width() // 2, 130))
+        self.screen.blit(banner, (WIDTH // 2 - banner.get_width() // 2, 138))
 
     # --- MAIN LOOP ---
     def run(self):
@@ -2531,6 +3584,8 @@ class Game:
                         running = self.handle_menu_click(event.pos, state="paused")
                     elif self.state == "settings":
                         self.handle_settings_mouse_down(event.pos)
+                    elif self.state == "cipher_puzzle":
+                        self.handle_cipher_puzzle_click(event.pos)
                 elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     if self.state == "settings":
                         self.handle_settings_mouse_up()
@@ -2542,6 +3597,8 @@ class Game:
                         if self.state == "settings":
                             self.dragging_volume = False
                             self.state = self.settings_return_state
+                        elif self.state == "cipher_puzzle":
+                            self.close_cipher_puzzle()
                         elif self.state in ("playing", "paused"):
                             self.toggle_pause()
                         elif self.state == "menu":
@@ -2563,8 +3620,14 @@ class Game:
                 result = self.current_level.update(dt, keys)
                 self.current_level.draw(self.screen, self.fonts, self.level_backgrounds)
                 self.draw_banner()
-                if result:
+                if isinstance(result, tuple) and result[0] == "cipher":
+                    self.open_cipher_puzzle(result[1])
+                elif result:
                     self.handle_result(result)
+            elif self.state == "cipher_puzzle":
+                self.current_level.draw(self.screen, self.fonts, self.level_backgrounds)
+                self.update_cipher_puzzle(dt)
+                self.draw_cipher_puzzle()
             elif self.state == "death_notice":
                 self.current_level.draw(self.screen, self.fonts, self.level_backgrounds)
                 self.draw_death_notice()

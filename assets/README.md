@@ -7,10 +7,15 @@ Put your own assets here to replace the built-in placeholders and procedural fal
 Place files in `assets/images/`:
 
 - `menu_background.png` or `menu_background.jpg` - main menu background
+- `app_icon.png` or `icon.png` - application window icon
+- `menu_logo.png` or `logo.png` - main menu logo, scaled automatically to fit the title area
 - `settings_background.png` or `settings_background.jpg` - settings screen background
+- `cipher_background.png` or `cipher_background.jpg` - background/panel image for level 2 cipher puzzle windows
 - `forest_background.png` or `forest_background.jpg` - level 1 forest background
 - `forest_layer_1.png` ... `forest_layer_12.png` - parallax layers for level 1, from far back to front
   If any of them are missing, the game can fall back to `forest_layer_1_auto.png` ... `forest_layer_12_auto.png` where available.
+- `bunker_layer_1.png` ... `bunker_layer_12.png` - parallax layers for level 2 bunker background, in the order indicated by the file names
+- `bunker_tileset.png` or `bunker_tileset.jpg` - repeating tileset texture for level 2 platforms and ceiling
 - `player_idle.png` or `dipper_idle.png` - player idle sprite
 - `player_run_1.png` or `dipper_run_1.png` - first running frame
 - `player_run_2.png` or `dipper_run_2.png` - second running frame
