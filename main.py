@@ -77,6 +77,14 @@ def clamp(value, low, high):
     return max(low, min(high, value))
 
 
+def can_land_on_one_way_platform(previous_rect, current_rect, platform_rect, velocity_y):
+    return (
+        velocity_y >= 0
+        and previous_rect.bottom <= platform_rect.top
+        and current_rect.bottom >= platform_rect.top
+    )
+
+
 def is_flashlight_pressed(keys):
     mouse_buttons = pygame.mouse.get_pressed(3)
     return keys[pygame.K_f] or mouse_buttons[0]
@@ -1034,7 +1042,7 @@ class ForestLevel:
 
 class BunkerLevel:
     def __init__(self):
-        self.length = 4300
+        self.length = 5600
         self.reset()
 
     def get_completed_cipher_ids(self):
@@ -1067,6 +1075,12 @@ class BunkerLevel:
                 self.particles.append(FloatText(message, anchor["rect"].x - 20, anchor["rect"].y - 20, CRIMSON))
 
     def reset(self):
+        def stretch_x(value):
+            return round(value * self.length / 4300)
+
+        def stretch_rect(rect):
+            return pygame.Rect(stretch_x(rect.x), rect.y, rect.width, rect.height)
+
         self.player = Player()
         self.player.reset_position(80, 420)
         self.player.health = 5
@@ -1081,79 +1095,88 @@ class BunkerLevel:
         self.particles = []
         self.interact_cooldown = 0.0
         self.platforms = [
-            pygame.Rect(0, 520, 360, 200),
-            pygame.Rect(420, 498, 220, 24),
-            pygame.Rect(710, 452, 210, 24),
-            pygame.Rect(980, 404, 220, 24),
-            pygame.Rect(1265, 352, 200, 24),
-            pygame.Rect(1500, 292, 190, 24),
-            pygame.Rect(1765, 240, 170, 24),
-            pygame.Rect(2000, 298, 210, 24),
-            pygame.Rect(2275, 358, 220, 24),
-            pygame.Rect(2555, 420, 210, 24),
-            pygame.Rect(2815, 474, 200, 24),
-            pygame.Rect(3075, 408, 230, 24),
-            pygame.Rect(3370, 338, 210, 24),
-            pygame.Rect(3645, 272, 190, 24),
-            pygame.Rect(3905, 332, 220, 24),
-            pygame.Rect(4120, 520, 180, 200),
+            stretch_rect(pygame.Rect(0, 520, 360, 200)),
+            stretch_rect(pygame.Rect(420, 492, 170, 24)),
+            stretch_rect(pygame.Rect(650, 446, 150, 24)),
+            stretch_rect(pygame.Rect(860, 398, 170, 24)),
+            stretch_rect(pygame.Rect(1085, 348, 180, 24)),
+            stretch_rect(pygame.Rect(1320, 392, 150, 24)),
+            stretch_rect(pygame.Rect(1510, 334, 170, 24)),
+            stretch_rect(pygame.Rect(1715, 272, 150, 24)),
+            stretch_rect(pygame.Rect(1905, 234, 165, 24)),
+            stretch_rect(pygame.Rect(2110, 282, 180, 24)),
+            stretch_rect(pygame.Rect(2330, 338, 170, 24)),
+            stretch_rect(pygame.Rect(2550, 396, 170, 24)),
+            stretch_rect(pygame.Rect(2760, 458, 150, 24)),
+            stretch_rect(pygame.Rect(2985, 404, 170, 24)),
+            stretch_rect(pygame.Rect(3205, 352, 180, 24)),
+            stretch_rect(pygame.Rect(3430, 298, 165, 24)),
+            stretch_rect(pygame.Rect(3645, 248, 150, 24)),
+            stretch_rect(pygame.Rect(3850, 302, 170, 24)),
+            stretch_rect(pygame.Rect(4060, 362, 180, 24)),
+            stretch_rect(pygame.Rect(4265, 420, 160, 24)),
+            stretch_rect(pygame.Rect(4120, 520, 180, 200)),
         ]
         self.hidden_platforms = [
-            pygame.Rect(860, 392, 100, 20),
-            pygame.Rect(1450, 236, 120, 20),
-            pygame.Rect(1910, 186, 120, 20),
-            pygame.Rect(2470, 314, 120, 20),
-            pygame.Rect(3240, 360, 120, 20),
-            pygame.Rect(3760, 210, 120, 20),
+            stretch_rect(pygame.Rect(960, 318, 110, 20)),
+            stretch_rect(pygame.Rect(1620, 244, 120, 20)),
+            stretch_rect(pygame.Rect(2210, 214, 120, 20)),
+            stretch_rect(pygame.Rect(2870, 332, 120, 20)),
+            stretch_rect(pygame.Rect(3510, 232, 120, 20)),
+            stretch_rect(pygame.Rect(3940, 196, 120, 20)),
         ]
         self.gravity_zones = [
-            pygame.Rect(1355, 82, 300, 190),
-            pygame.Rect(2350, 88, 210, 170),
-            pygame.Rect(3490, 72, 220, 180),
+            stretch_rect(pygame.Rect(1450, 94, 250, 170)),
+            stretch_rect(pygame.Rect(2780, 92, 240, 170)),
+            stretch_rect(pygame.Rect(3610, 86, 230, 170)),
         ]
         self.moving_platforms = [
             {
-                "rect": pygame.Rect(1570, 214, 140, 22),
-                "start": pygame.Vector2(1570, 214),
-                "end": pygame.Vector2(1730, 168),
+                "rect": stretch_rect(pygame.Rect(1475, 258, 130, 22)),
+                "start": pygame.Vector2(stretch_x(1475), 258),
+                "end": pygame.Vector2(stretch_x(1660), 198),
                 "time": 0.0,
             },
             {
-                "rect": pygame.Rect(2860, 372, 150, 22),
-                "start": pygame.Vector2(2860, 372),
-                "end": pygame.Vector2(3040, 278),
+                "rect": stretch_rect(pygame.Rect(2460, 364, 130, 22)),
+                "start": pygame.Vector2(stretch_x(2460), 364),
+                "end": pygame.Vector2(stretch_x(2660), 290),
                 "time": 0.8,
             },
             {
-                "rect": pygame.Rect(3660, 236, 150, 22),
-                "start": pygame.Vector2(3660, 236),
-                "end": pygame.Vector2(3900, 236),
+                "rect": stretch_rect(pygame.Rect(3690, 216, 140, 22)),
+                "start": pygame.Vector2(stretch_x(3690), 216),
+                "end": pygame.Vector2(stretch_x(3920), 216),
                 "time": 1.9,
             },
         ]
+        early_spike_platform = self.platforms[1]
+        high_spike_platform = self.platforms[8]
+        late_spike_platform = self.platforms[13]
         self.spikes = [
-            pygame.Rect(520, 482, 70, 16),
-            pygame.Rect(1320, 336, 78, 16),
-            pygame.Rect(3210, 392, 78, 16),
+            pygame.Rect(early_spike_platform.centerx - 35, early_spike_platform.top - 16, 70, 16),
+            pygame.Rect(high_spike_platform.centerx - 36, high_spike_platform.top - 16, 72, 16),
+            pygame.Rect(late_spike_platform.centerx - 39, late_spike_platform.top - 16, 78, 16),
         ]
         self.energy_gates = [
-            {"rect": pygame.Rect(1105, 300, 18, 104), "time": 0.0, "cycle": 2.2, "active_window": 1.1, "phase": 0.0},
-            {"rect": pygame.Rect(3448, 182, 18, 156), "time": 0.2, "cycle": 2.4, "active_window": 0.8, "phase": 1.1},
+            {"rect": stretch_rect(pygame.Rect(1190, 244, 18, 104)), "time": 0.0, "cycle": 2.2, "active_window": 1.0, "phase": 0.0},
+            {"rect": stretch_rect(pygame.Rect(3340, 202, 18, 150)), "time": 0.2, "cycle": 2.4, "active_window": 0.75, "phase": 1.1},
         ]
         self.creatures = [
-            {"type": "crawler", "rect": pygame.Rect(470, 470, 44, 28), "left": 430, "right": 604, "speed": 86, "dir": 1, "anim": random.random(), "burn": 0.0},
-            {"type": "crawler", "rect": pygame.Rect(1010, 376, 44, 28), "left": 990, "right": 1148, "speed": 92, "dir": -1, "anim": random.random(), "burn": 0.0},
-            {"type": "crawler", "rect": pygame.Rect(1892, 212, 44, 28), "left": 1775, "right": 1928, "speed": 98, "dir": -1, "anim": random.random(), "burn": 0.0},
-            {"type": "crawler", "rect": pygame.Rect(3178, 380, 44, 28), "left": 3090, "right": 3278, "speed": 104, "dir": -1, "anim": random.random(), "burn": 0.0},
-            {"type": "wisp", "origin": pygame.Vector2(780, 360), "range": 78, "axis": "y", "speed": 2.0, "phase": 0.3, "radius": 18, "anim": random.random()},
-            {"type": "wisp", "origin": pygame.Vector2(1690, 150), "range": 96, "axis": "x", "speed": 1.7, "phase": 1.2, "radius": 18, "anim": random.random()},
-            {"type": "wisp", "origin": pygame.Vector2(3395, 256), "range": 94, "axis": "x", "speed": 1.9, "phase": 0.8, "radius": 20, "anim": random.random()},
+            {"type": "crawler", "rect": pygame.Rect(self.platforms[3].centerx - 22, self.platforms[3].top - 28, 44, 28), "left": self.platforms[3].left + 10, "right": self.platforms[3].right - 10, "speed": 86, "dir": 1, "anim": random.random(), "burn": 0.0},
+            {"type": "crawler", "rect": pygame.Rect(self.platforms[9].centerx - 22, self.platforms[9].top - 28, 44, 28), "left": self.platforms[9].left + 10, "right": self.platforms[9].right - 10, "speed": 94, "dir": -1, "anim": random.random(), "burn": 0.0},
+            {"type": "crawler", "rect": pygame.Rect(self.platforms[14].centerx - 22, self.platforms[14].top - 28, 44, 28), "left": self.platforms[14].left + 10, "right": self.platforms[14].right - 10, "speed": 102, "dir": -1, "anim": random.random(), "burn": 0.0},
+            {"type": "wisp", "origin": pygame.Vector2(stretch_x(690), 388), "range": 66, "axis": "y", "speed": 1.8, "phase": 0.3, "radius": 18, "anim": random.random()},
+            {"type": "wisp", "origin": pygame.Vector2(stretch_x(3470), 248), "range": 88, "axis": "x", "speed": 1.7, "phase": 1.2, "radius": 18, "anim": random.random()},
         ]
+        glow_platform = self.platforms[4]
+        stairs_platform = self.platforms[9]
+        rift_platform = self.platforms[15]
         self.ciphers = [
             {
                 "id": "glow",
                 "title": "Lens Cipher",
-                "rect": pygame.Rect(1060, 352, 54, 52),
+                "rect": pygame.Rect(glow_platform.centerx - 27, glow_platform.top - 52, 54, 52),
                 "solved": False,
                 "hint": "Reveal the 3 lamps in left-to-right order.",
                 "reward": "Reward: stronger diary lens in the boss fight.",
@@ -1161,7 +1184,7 @@ class BunkerLevel:
             {
                 "id": "stairs",
                 "title": "Stair Cipher",
-                "rect": pygame.Rect(1998, 248, 54, 52),
+                "rect": pygame.Rect(stairs_platform.centerx - 27, stairs_platform.top - 52, 54, 52),
                 "solved": False,
                 "hint": "Step on the plates from low to high.",
                 "reward": "Reward: the portal charges faster in the finale.",
@@ -1169,7 +1192,7 @@ class BunkerLevel:
             {
                 "id": "rift",
                 "title": "Seal Cipher",
-                "rect": pygame.Rect(3388, 286, 54, 52),
+                "rect": pygame.Rect(rift_platform.centerx - 27, rift_platform.top - 52, 54, 52),
                 "solved": False,
                 "hint": "Reveal and seal 3 tears before the timer resets.",
                 "reward": "Reward: Bill begins the last battle weakened.",
@@ -1180,9 +1203,9 @@ class BunkerLevel:
                 "type": "sequence",
                 "progress": 0,
                 "nodes": [
-                    {"rect": pygame.Rect(910, 360, 34, 34), "active": False},
-                    {"rect": pygame.Rect(984, 324, 34, 34), "active": False},
-                    {"rect": pygame.Rect(1054, 286, 34, 34), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(910, 360, 34, 34)), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(984, 324, 34, 34)), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(1054, 286, 34, 34)), "active": False},
                 ],
             },
             "stairs": {
@@ -1190,9 +1213,9 @@ class BunkerLevel:
                 "progress": 0,
                 "order": [0, 1, 2],
                 "nodes": [
-                    {"rect": pygame.Rect(1854, 306, 68, 16), "active": False},
-                    {"rect": pygame.Rect(2010, 264, 68, 16), "active": False},
-                    {"rect": pygame.Rect(2180, 206, 68, 16), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(1854, 306, 68, 16)), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(2010, 264, 68, 16)), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(2180, 206, 68, 16)), "active": False},
                 ],
             },
             "rift": {
@@ -1200,22 +1223,31 @@ class BunkerLevel:
                 "timer": 0.0,
                 "duration": 6.8,
                 "nodes": [
-                    {"rect": pygame.Rect(3306, 282, 34, 34), "active": False},
-                    {"rect": pygame.Rect(3474, 236, 34, 34), "active": False},
-                    {"rect": pygame.Rect(3726, 168, 34, 34), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(3306, 282, 34, 34)), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(3474, 236, 34, 34)), "active": False},
+                    {"rect": stretch_rect(pygame.Rect(3726, 168, 34, 34)), "active": False},
                 ],
             },
         }
+        page_platform_a = self.platforms[2]
+        page_platform_b = self.platforms[4]
+        page_hidden_a = self.hidden_platforms[1]
+        page_platform_c = self.platforms[9]
+        page_hidden_b = self.hidden_platforms[3]
+        page_platform_d = self.platforms[12]
+        page_platform_e = self.platforms[14]
+        page_platform_f = self.platforms[15]
+        page_hidden_c = self.hidden_platforms[5]
         self.pages = [
-            {"rect": pygame.Rect(760, 400, 26, 32), "hidden": False, "taken": False, "lock": None},
-            {"rect": pygame.Rect(1154, 352, 26, 32), "hidden": False, "taken": False, "lock": None},
-            {"rect": pygame.Rect(1715, 166, 26, 32), "hidden": True, "taken": False, "lock": None},
-            {"rect": pygame.Rect(2094, 246, 26, 32), "hidden": False, "taken": False, "lock": None},
-            {"rect": pygame.Rect(2592, 382, 26, 32), "hidden": True, "taken": False, "lock": None},
-            {"rect": pygame.Rect(2890, 330, 26, 32), "hidden": False, "taken": False, "lock": None},
-            {"rect": pygame.Rect(3288, 300, 26, 32), "hidden": False, "taken": False, "lock": None},
-            {"rect": pygame.Rect(3408, 286, 26, 32), "hidden": False, "taken": False, "lock": "rift"},
-            {"rect": pygame.Rect(3800, 160, 26, 32), "hidden": True, "taken": False, "lock": None},
+            {"rect": pygame.Rect(page_platform_a.centerx - 13, page_platform_a.top - 32, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(page_platform_b.centerx - 13, page_platform_b.top - 32, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(page_hidden_a.centerx - 13, page_hidden_a.top - 32, 26, 32), "hidden": True, "taken": False, "lock": None},
+            {"rect": pygame.Rect(page_platform_c.centerx - 13, page_platform_c.top - 32, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(page_hidden_b.centerx - 13, page_hidden_b.top - 32, 26, 32), "hidden": True, "taken": False, "lock": None},
+            {"rect": pygame.Rect(page_platform_d.centerx - 13, page_platform_d.top - 32, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(page_platform_e.centerx - 13, page_platform_e.top - 32, 26, 32), "hidden": False, "taken": False, "lock": None},
+            {"rect": pygame.Rect(page_platform_f.centerx - 13, page_platform_f.top - 32, 26, 32), "hidden": False, "taken": False, "lock": "rift"},
+            {"rect": pygame.Rect(page_hidden_c.centerx - 13, page_hidden_c.top - 32, 26, 32), "hidden": True, "taken": False, "lock": None},
         ]
         for creature in self.creatures:
             if creature["type"] == "wisp":
@@ -1285,32 +1317,18 @@ class BunkerLevel:
         for platform in self.moving_platforms:
             current_rect = platform["rect"]
             prev_rect = platform.get("prev_rect", current_rect)
-            dx = round(platform.get("delta", pygame.Vector2()).x)
             dy = round(platform.get("delta", pygame.Vector2()).y)
             if not player.rect.colliderect(current_rect):
                 continue
             if dy < 0 and prev_rect.top >= player.rect.bottom:
                 player.rect.bottom = current_rect.top
                 player.vel.y = min(player.vel.y, 0)
-            elif dy > 0 and prev_rect.bottom <= player.rect.top:
-                player.rect.top = current_rect.bottom
-                player.vel.y = max(player.vel.y, 0)
-            elif dx > 0 and prev_rect.right <= player.rect.left:
-                player.rect.left = current_rect.right
-            elif dx < 0 and prev_rect.left >= player.rect.right:
-                player.rect.right = current_rect.left
 
         previous = player.rect.copy()
         player.rect.x += int(move_x * dt)
         collision_platforms = self.active_platforms()
         if player.reveal_active:
             collision_platforms += self.hidden_platforms
-        for platform in collision_platforms:
-            if player.rect.colliderect(platform):
-                if move_x > 0:
-                    player.rect.right = platform.left
-                elif move_x < 0:
-                    player.rect.left = platform.right
         player.rect.x = clamp(player.rect.x, 20, self.length - player.rect.width - 20)
 
         if self.current_gravity == 0:
@@ -1321,13 +1339,10 @@ class BunkerLevel:
         player.on_ground = False
         for platform in collision_platforms:
             if player.rect.colliderect(platform):
-                if previous.bottom <= platform.top and player.vel.y >= 0:
+                if can_land_on_one_way_platform(previous, player.rect, platform, player.vel.y):
                     player.rect.bottom = platform.top
                     player.vel.y = 0
                     player.on_ground = True
-                elif previous.top >= platform.bottom and player.vel.y <= 0:
-                    player.rect.top = platform.bottom
-                    player.vel.y = 0
 
         if player.rect.top <= self.ceiling_y:
             player.rect.top = self.ceiling_y
@@ -1417,7 +1432,7 @@ class BunkerLevel:
         self.camera_x = clamp(player.rect.centerx - WIDTH // 2, 0, self.length - WIDTH)
         self.particles = [p for p in self.particles if p.update(dt)]
         # Level 2 completion condition: collect every page and reach the exit side.
-        if self.collected >= self.target_pages and player.rect.centerx > 4080:
+        if self.collected >= self.target_pages and player.rect.centerx > self.length - 220:
             self.done = True
         return "lose" if player.health <= 0 else ("next" if self.done else None)
 
@@ -1576,24 +1591,26 @@ class BossLevel:
         self.camera_x = 0
         self.particles = []
         self.platforms = [
-            pygame.Rect(230, 520, 220, 24),
-            pygame.Rect(520, 445, 180, 24),
-            pygame.Rect(860, 380, 180, 24),
-            pygame.Rect(1210, 345, 190, 24),
-            pygame.Rect(1600, 345, 190, 24),
-            pygame.Rect(1960, 380, 180, 24),
-            pygame.Rect(2290, 445, 180, 24),
-            pygame.Rect(2570, 520, 220, 24),
+            pygame.Rect(210, 520, 220, 24),
+            pygame.Rect(500, 456, 170, 24),
+            pygame.Rect(760, 396, 160, 24),
+            pygame.Rect(1040, 344, 170, 24),
+            pygame.Rect(1320, 294, 150, 24),
+            pygame.Rect(1600, 294, 150, 24),
+            pygame.Rect(1875, 344, 170, 24),
+            pygame.Rect(2145, 396, 160, 24),
+            pygame.Rect(2405, 456, 170, 24),
+            pygame.Rect(2650, 520, 180, 24),
         ]
         self.hidden_platforms = [
-            pygame.Rect(700, 310, 130, 20),
-            pygame.Rect(1440, 120, 130, 20),
-            pygame.Rect(2140, 310, 130, 20),
+            pygame.Rect(640, 326, 130, 20),
+            pygame.Rect(1470, 154, 130, 20),
+            pygame.Rect(2240, 326, 130, 20),
         ]
         self.boss_rect = pygame.Rect(self.length // 2 - 80, 145, 160, 190)
         self.boss_anchor_x = [880, self.length // 2, 2120]
         self.boss_teleport_timer = 1.9
-        self.boss_max_health = 12
+        self.boss_max_health = 6
         self.boss_health = self.boss_max_health
         self.boss_fire_timer = 1.1
         self.ground_burst_timer = 6.4
@@ -1610,6 +1627,16 @@ class BossLevel:
         self.weak_point_life_bonus = 0.0
         self.true_escape = False
         self.win = False
+        self.phase_two_started = False
+        self.phase_two_transition = False
+        self.phase_two_timer = 0.0
+        self.phase_two_threshold = max(3, math.ceil(self.boss_max_health / 2))
+        self.anchor_rift = None
+        self.anchor_rift_cooldown = 2.2
+        self.boss_defeat_started = False
+        self.boss_defeat_timer = 0.0
+        self.boss_rift_center = pygame.Vector2(self.boss_rect.centerx + 10, self.boss_rect.centery - 8)
+        self.boss_rift_base_size = pygame.Vector2(210, 276)
 
     def apply_bunker_bonuses(self, solved_ciphers):
         solved = set(solved_ciphers)
@@ -1622,20 +1649,21 @@ class BossLevel:
         if "stairs" in solved:
             self.portal_charge_goal = 2.35
         if "rift" in solved:
-            self.boss_max_health = 10
+            self.boss_max_health = 5
             self.boss_health = min(self.boss_health, self.boss_max_health)
         else:
-            self.boss_max_health = 12
+            self.boss_max_health = 6
             self.boss_health = min(self.boss_health, self.boss_max_health)
+        self.phase_two_threshold = max(3, math.ceil(self.boss_max_health / 2))
 
-    def create_dark_energy_attack(self):
-        origin = pygame.Vector2(self.boss_rect.centerx, self.boss_rect.centery)
-        target = pygame.Vector2(self.player.rect.centerx, self.player.rect.centery)
+    def create_dark_energy_attack(self, origin=None, target=None, angle_jitter=18):
+        origin = pygame.Vector2(origin or (self.boss_rect.centerx, self.boss_rect.centery))
+        target = pygame.Vector2(target or (self.player.rect.centerx, self.player.rect.centery))
         direction = target - origin
         if direction.length() == 0:
             direction = pygame.Vector2(-1, 0)
         direction = direction.normalize()
-        direction.rotate_ip(random.uniform(-18, 18))
+        direction.rotate_ip(random.uniform(-angle_jitter, angle_jitter))
         return {
             "origin": pygame.Vector2(origin),
             "dir": pygame.Vector2(direction),
@@ -1653,10 +1681,10 @@ class BossLevel:
     def spawn_projectile(self):
         self.projectiles.append(self.create_dark_energy_attack())
 
-    def queue_telegraphed_attack(self):
-        attack = self.create_dark_energy_attack()
+    def queue_telegraphed_attack(self, origin=None, target=None, timer=0.42, angle_jitter=18):
+        attack = self.create_dark_energy_attack(origin=origin, target=target, angle_jitter=angle_jitter)
         attack["travel"] = attack["max_length"]
-        self.telegraphs.append({"attack": attack, "timer": 0.42})
+        self.telegraphs.append({"attack": attack, "timer": timer})
         play_sfx("boss_attack")
 
     def queue_ground_burst(self):
@@ -1698,6 +1726,190 @@ class BossLevel:
             return
         self.weak_points.append({"rect": rect, "life": 4.0 + self.weak_point_life_bonus})
 
+    def start_phase_two_transition(self):
+        if self.phase_two_started or self.phase_two_transition or self.boss_defeat_started:
+            return
+        self.phase_two_transition = True
+        self.phase_two_timer = 0.0
+        self.anchor_rift = None
+        self.projectiles.clear()
+        self.telegraphs.clear()
+        self.ground_telegraphs.clear()
+        self.weak_points.clear()
+        self.boss_rect.centerx = self.length // 2
+        self.boss_teleport_timer = 1.0
+        self.boss_fire_timer = 0.7
+        self.ground_burst_timer = 2.6
+        self.weak_timer = 1.7
+        self.distortion = 1.0
+        self.message = "Phase 2: Bill tears open anchors in the arena."
+        play_sfx("boss_teleport")
+        self.particles.append(FloatText("The tear widens", self.boss_rect.x - 30, self.boss_rect.y - 34, AMBER, 1.8))
+
+    def spawn_anchor_rift(self):
+        candidate_x = [420, 720, 1030, 1360, 1650, 1960, 2270, 2570]
+        viable = [x for x in candidate_x if abs(x - self.player.rect.centerx) > 180]
+        x = random.choice(viable or candidate_x)
+        y = random.choice([188, 236, 284, 332])
+        self.anchor_rift = {
+            "center": pygame.Vector2(x, y),
+            "life": 4.8,
+            "fire_timer": 0.45,
+            "phase": random.uniform(0.0, math.tau),
+            "radius": random.randint(42, 54),
+        }
+        self.distortion = max(self.distortion, 0.72)
+        play_sfx("boss_teleport")
+        self.particles.append(FloatText("Anchor rift", x - 44, y - 36, CYAN, 1.3))
+
+    def update_phase_two(self, dt):
+        if self.phase_two_transition:
+            self.phase_two_timer += dt
+            self.distortion = max(self.distortion, 0.35)
+            if self.phase_two_timer >= 1.05:
+                self.phase_two_transition = False
+                self.phase_two_started = True
+                self.anchor_rift_cooldown = 0.35
+            return
+
+        self.anchor_rift_cooldown = max(0.0, self.anchor_rift_cooldown - dt)
+        if self.anchor_rift is None and self.anchor_rift_cooldown <= 0.0:
+            self.spawn_anchor_rift()
+
+        if not self.anchor_rift:
+            return
+
+        self.anchor_rift["life"] -= dt
+        self.anchor_rift["fire_timer"] -= dt
+        if self.anchor_rift["fire_timer"] <= 0:
+            self.queue_telegraphed_attack(
+                origin=self.anchor_rift["center"],
+                target=(self.player.rect.centerx, self.player.rect.centery),
+                timer=0.28,
+                angle_jitter=10,
+            )
+            self.anchor_rift["fire_timer"] = random.uniform(0.72, 0.98)
+
+        hit_rect = pygame.Rect(0, 0, self.anchor_rift["radius"] * 2, self.anchor_rift["radius"] * 2)
+        hit_rect.center = (round(self.anchor_rift["center"].x), round(self.anchor_rift["center"].y))
+        if self.player.rect.colliderect(hit_rect.inflate(10, 14)) and self.player.apply_damage():
+            play_sfx("hit")
+            self.particles.append(FloatText("Tear burn", self.player.rect.x - 8, self.player.rect.y - 18, CRIMSON))
+            push = -260 if self.player.rect.centerx < hit_rect.centerx else 260
+            self.player.rect.x += -18 if push < 0 else 18
+
+        if self.anchor_rift["life"] <= 0:
+            self.particles.append(FloatText("Anchor sealed", self.anchor_rift["center"].x - 44, self.anchor_rift["center"].y - 24, AMBER, 1.2))
+            self.anchor_rift = None
+            self.anchor_rift_cooldown = random.uniform(2.2, 3.4)
+
+    def start_boss_defeat_sequence(self):
+        if self.boss_defeat_started:
+            return
+        self.boss_defeat_started = True
+        self.phase_two_transition = False
+        self.boss_defeat_timer = 0.0
+        self.boss_rift_center = pygame.Vector2(self.boss_rect.centerx + 10, self.boss_rect.centery - 8)
+        self.anchor_rift = None
+        self.projectiles.clear()
+        self.telegraphs.clear()
+        self.ground_telegraphs.clear()
+        self.weak_points.clear()
+        self.distortion = 0.95
+        play_sfx("boss_teleport")
+        self.particles.append(FloatText("Bill's shadow is dragged into the tear", self.boss_rect.x - 90, self.boss_rect.y - 30, CYAN, 1.9))
+
+    def update_boss_defeat_sequence(self, dt):
+        self.boss_defeat_timer += dt
+        self.distortion = max(self.distortion, 0.25)
+        if self.boss_defeat_timer >= 1.55:
+            self.boss_defeat_started = False
+            self.stan_ready = True
+            self.message = "Level 3: Bill is gone. Find Stan and charge the portal."
+
+    def draw_boss_entity(self, surface, boss_rect, hover_time, alpha=255, scale=1.0, extra_offset=(0, 0), pulse_boost=1.0):
+        hover_y = math.sin(hover_time * 2.2) * 14 + math.sin(hover_time * 4.4 + 0.8) * 4
+        sway_x = math.sin(hover_time * 1.6 + 0.4) * 6
+        offset_x = round(sway_x + extra_offset[0])
+        offset_y = round(hover_y + extra_offset[1])
+        if BossLevel.sprites:
+            frame_index = int(pygame.time.get_ticks() * 0.0012) % len(BossLevel.sprites)
+            boss_sprite = BossLevel.sprites[frame_index]
+            target_size = fit_size(
+                boss_sprite.get_size(),
+                (max(32, int((boss_rect.width + 90) * scale)), max(32, int((boss_rect.height + 90) * scale))),
+            )
+            scaled = pygame.transform.smoothscale(boss_sprite, target_size)
+            pulse = (0.92 + 0.08 * math.sin(pygame.time.get_ticks() * 0.0013)) * pulse_boost
+            if pulse != 1.0:
+                tinted = scaled.copy()
+                tinted.fill((int(20 * pulse), int(40 * pulse), int(75 * pulse), 0), special_flags=pygame.BLEND_RGBA_ADD)
+                scaled = tinted
+            if alpha < 255:
+                scaled.set_alpha(alpha)
+            shadow_rect = pygame.Rect(0, 0, max(18, int(scaled.get_width() * 0.72)), max(8, int(22 * scale)))
+            shadow_rect.center = (boss_rect.centerx, boss_rect.bottom + 26)
+            shadow = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow, (8, 6, 14, min(105, max(0, int(alpha * 0.45)))), shadow.get_rect())
+            surface.blit(shadow, shadow_rect.topleft)
+            draw_rect = scaled.get_rect(center=(boss_rect.centerx + offset_x, boss_rect.centery + offset_y))
+            surface.blit(scaled, draw_rect.topleft)
+        else:
+            scaled_size = (max(26, int(boss_rect.width * scale)), max(42, int(boss_rect.height * scale)))
+            floating_rect = pygame.Rect(0, 0, *scaled_size)
+            floating_rect.center = (boss_rect.centerx + offset_x, boss_rect.centery + offset_y)
+            shadow_rect = pygame.Rect(0, 0, max(18, int(floating_rect.width * 0.72)), max(8, int(18 * scale)))
+            shadow_rect.center = (boss_rect.centerx, boss_rect.bottom + 18)
+            shadow = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow, (8, 6, 14, min(100, max(0, int(alpha * 0.4)))), shadow.get_rect())
+            surface.blit(shadow, shadow_rect.topleft)
+            fallback = pygame.Surface(floating_rect.size, pygame.SRCALPHA)
+            draw_bill_shadow(fallback, fallback.get_rect(), self.boss_health)
+            if alpha < 255:
+                fallback.set_alpha(alpha)
+            surface.blit(fallback, floating_rect.topleft)
+
+    def draw_boss_defeat_effect(self, surface):
+        boss_rect = self.boss_rect.move(-self.camera_x, 0)
+        timer = self.boss_defeat_timer
+        open_progress = clamp(timer / 0.34, 0.0, 1.0)
+        close_progress = clamp((timer - 1.0) / 0.42, 0.0, 1.0)
+        rift_strength = open_progress * (1.0 - close_progress)
+        if rift_strength > 0.02:
+            width = max(18, int(self.boss_rift_base_size.x * rift_strength))
+            height = max(32, int(self.boss_rift_base_size.y * rift_strength))
+            rift_rect = pygame.Rect(0, 0, width, height)
+            rift_rect.center = (round(self.boss_rift_center.x - self.camera_x), round(self.boss_rift_center.y))
+            draw_rift(surface, rift_rect, timer * 2.8)
+        pull_progress = clamp((timer - 0.16) / 0.82, 0.0, 1.0)
+        if pull_progress < 1.0:
+            target_center = pygame.Vector2(self.boss_rift_center.x - self.camera_x, self.boss_rift_center.y)
+            current_center = pygame.Vector2(boss_rect.center)
+            offset = (target_center - current_center) * (pull_progress * 0.8)
+            scale = 1.0 - 0.58 * pull_progress
+            alpha = int(255 * (1.0 - 0.88 * pull_progress))
+            self.draw_boss_entity(
+                surface,
+                boss_rect,
+                pygame.time.get_ticks() * 0.001,
+                alpha=alpha,
+                scale=scale,
+                extra_offset=(offset.x, offset.y),
+                pulse_boost=1.15,
+            )
+
+    def draw_anchor_rift(self, surface):
+        if not self.anchor_rift:
+            return
+        pulse = 1.0 + math.sin(pygame.time.get_ticks() * 0.01 + self.anchor_rift["phase"]) * 0.16
+        radius = max(18, int(self.anchor_rift["radius"] * pulse))
+        rect = pygame.Rect(0, 0, radius * 2, int(radius * 2.5))
+        rect.center = (round(self.anchor_rift["center"].x - self.camera_x), round(self.anchor_rift["center"].y))
+        draw_rift(surface, rect, pygame.time.get_ticks() * 0.003 + self.anchor_rift["phase"])
+        ring = pygame.Surface((rect.width + 50, rect.height + 40), pygame.SRCALPHA)
+        pygame.draw.ellipse(ring, (112, 224, 255, 38), ring.get_rect(), width=8)
+        surface.blit(ring, (rect.x - 25, rect.y - 20))
+
     def update(self, dt, keys):
         player = self.player
         player.update_common(dt)
@@ -1724,23 +1936,17 @@ class BossLevel:
         collision_platforms = list(self.platforms)
         if player.reveal_active:
             collision_platforms += self.hidden_platforms
-        for platform in collision_platforms:
-            if player.rect.colliderect(platform):
-                if move_x > 0:
-                    player.rect.right = platform.left
-                elif move_x < 0:
-                    player.rect.left = platform.right
 
         player.vel.y += 1650 * dt
         player.rect.y += int(player.vel.y * dt)
         player.on_ground = False
         for platform in collision_platforms + [pygame.Rect(0, GROUND_Y, self.length, 120)]:
-            if player.rect.colliderect(platform) and previous.bottom <= platform.top and player.vel.y >= 0:
+            if player.rect.colliderect(platform) and can_land_on_one_way_platform(previous, player.rect, platform, player.vel.y):
                 player.rect.bottom = platform.top
                 player.vel.y = 0
                 player.on_ground = True
 
-        if not self.stan_ready:
+        if not self.stan_ready and not self.boss_defeat_started and not self.phase_two_transition:
             self.boss_teleport_timer -= dt
             if self.boss_teleport_timer <= 0:
                 choices = [anchor for anchor in self.boss_anchor_x if abs(anchor - self.boss_rect.centerx) > 20]
@@ -1753,13 +1959,13 @@ class BossLevel:
         self.camera_x = clamp(player.rect.centerx - WIDTH // 2, 0, self.length - WIDTH)
 
         self.boss_fire_timer -= dt
-        if self.boss_fire_timer <= 0 and not self.stan_ready:
+        if self.boss_fire_timer <= 0 and not self.stan_ready and not self.boss_defeat_started and not self.phase_two_transition:
             self.queue_telegraphed_attack()
-            self.boss_fire_timer = 0.86 if self.boss_health > 5 else 0.58
+            self.boss_fire_timer = 0.48 if self.phase_two_started else (0.86 if self.boss_health > 5 else 0.58)
         self.ground_burst_timer -= dt
-        if self.ground_burst_timer <= 0 and not self.stan_ready:
+        if self.ground_burst_timer <= 0 and not self.stan_ready and not self.boss_defeat_started and not self.phase_two_transition:
             self.queue_ground_burst()
-            self.ground_burst_timer = random.uniform(6.8, 9.2)
+            self.ground_burst_timer = random.uniform(5.2, 7.0) if self.phase_two_started else random.uniform(6.8, 9.2)
         for warning in list(self.telegraphs):
             warning["timer"] -= dt
             warning["attack"]["anim_time"] += dt
@@ -1810,9 +2016,9 @@ class BossLevel:
                 self.projectiles.remove(projectile)
 
         self.weak_timer -= dt
-        if self.weak_timer <= 0 and not self.stan_ready:
+        if self.weak_timer <= 0 and not self.stan_ready and not self.boss_defeat_started and not self.phase_two_transition:
             self.spawn_weak_point()
-            self.weak_timer = random.uniform(2.2, 3.3)
+            self.weak_timer = random.uniform(1.6, 2.3) if self.phase_two_started else random.uniform(2.2, 3.3)
         for point in list(self.weak_points):
             point["life"] -= dt
             if point["life"] <= 0:
@@ -1825,9 +2031,15 @@ class BossLevel:
                 play_sfx("cipher_solve")
                 self.particles.append(FloatText("Weak point broken", point["rect"].x - 30, point["rect"].y - 20, CYAN))
 
+        if 0 < self.boss_health <= self.phase_two_threshold and not self.phase_two_started and not self.phase_two_transition and not self.boss_defeat_started:
+            self.start_phase_two_transition()
+        if self.phase_two_started or self.phase_two_transition:
+            self.update_phase_two(dt)
         self.distortion = max(0.0, self.distortion - dt)
-        if self.boss_health <= 0:
-            self.stan_ready = True
+        if self.boss_health <= 0 and not self.stan_ready:
+            self.start_boss_defeat_sequence()
+        if self.boss_defeat_started:
+            self.update_boss_defeat_sequence(dt)
         if self.stan_ready and player.rect.colliderect(self.stan_rect):
             self.stan_ready = "met"
         close_to_portal = player.rect.colliderect(self.portal_rect.inflate(30, 30))
@@ -1901,36 +2113,11 @@ class BossLevel:
             else:
                 pygame.draw.rect(surface, (91, 145, 152), rect, 1, border_radius=6)
         draw_portal(surface, self.portal_rect.move(-self.camera_x, 0), self.player.portal_charge / self.portal_charge_goal)
-        if not self.stan_ready:
-            boss_rect = self.boss_rect.move(-self.camera_x, 0)
-            hover_time = pygame.time.get_ticks() * 0.001
-            hover_y = math.sin(hover_time * 2.2) * 14 + math.sin(hover_time * 4.4 + 0.8) * 4
-            sway_x = math.sin(hover_time * 1.6 + 0.4) * 6
-            if BossLevel.sprites:
-                frame_index = int(pygame.time.get_ticks() * 0.0012) % len(BossLevel.sprites)
-                boss_sprite = BossLevel.sprites[frame_index]
-                target_size = fit_size(boss_sprite.get_size(), (boss_rect.width + 90, boss_rect.height + 90))
-                scaled = pygame.transform.smoothscale(boss_sprite, target_size)
-                shadow_rect = pygame.Rect(0, 0, int(scaled.get_width() * 0.72), 22)
-                shadow_rect.center = (boss_rect.centerx, boss_rect.bottom + 26)
-                shadow = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
-                pygame.draw.ellipse(shadow, (8, 6, 14, 105), shadow.get_rect())
-                surface.blit(shadow, shadow_rect.topleft)
-                draw_rect = scaled.get_rect(center=(boss_rect.centerx + round(sway_x), boss_rect.centery + round(hover_y)))
-                pulse = 0.92 + 0.08 * math.sin(pygame.time.get_ticks() * 0.0013)
-                if pulse != 1.0:
-                    tinted = scaled.copy()
-                    tinted.fill((int(20 * pulse), int(40 * pulse), int(75 * pulse), 0), special_flags=pygame.BLEND_RGBA_ADD)
-                    scaled = tinted
-                surface.blit(scaled, draw_rect.topleft)
-            else:
-                floating_rect = boss_rect.move(round(sway_x), round(hover_y))
-                shadow_rect = pygame.Rect(0, 0, int(floating_rect.width * 0.72), 18)
-                shadow_rect.center = (boss_rect.centerx, boss_rect.bottom + 18)
-                shadow = pygame.Surface(shadow_rect.size, pygame.SRCALPHA)
-                pygame.draw.ellipse(shadow, (8, 6, 14, 100), shadow.get_rect())
-                surface.blit(shadow, shadow_rect.topleft)
-                draw_bill_shadow(surface, floating_rect, self.boss_health)
+        self.draw_anchor_rift(surface)
+        if self.boss_defeat_started:
+            self.draw_boss_defeat_effect(surface)
+        elif not self.stan_ready:
+            self.draw_boss_entity(surface, self.boss_rect.move(-self.camera_x, 0), pygame.time.get_ticks() * 0.001)
         else:
             draw_stan(surface, self.stan_rect.move(-self.camera_x, 0))
         for warning in self.telegraphs:
@@ -1948,7 +2135,16 @@ class BossLevel:
         draw_hud(surface, fonts, self.player, max(0, self.boss_max_health - self.boss_health), self.boss_max_health, 3, self.message)
         boss_text = fonts["small"].render(f"Bill's shadow: {max(0, self.boss_health)}/{self.boss_max_health}", True, WHITE)
         surface.blit(boss_text, (WIDTH - 240, 88))
-        if self.stan_ready:
+        if self.boss_defeat_started:
+            text = fonts["small"].render("Bill's shadow is collapsing into the tear", True, CYAN)
+            surface.blit(text, (WIDTH // 2 - text.get_width() // 2, 110))
+        elif self.phase_two_transition:
+            text = fonts["small"].render("Phase 2: the arena is splitting open", True, AMBER)
+            surface.blit(text, (WIDTH // 2 - text.get_width() // 2, 110))
+        elif self.phase_two_started:
+            text = fonts["small"].render("Phase 2: anchor rifts fire from the arena", True, CYAN)
+            surface.blit(text, (WIDTH // 2 - text.get_width() // 2, 110))
+        elif self.stan_ready:
             text = fonts["small"].render("Hold E near portal to escape", True, AMBER)
             surface.blit(text, (WIDTH // 2 - text.get_width() // 2, 110))
         bonus_parts = []
@@ -2600,6 +2796,7 @@ class Game:
         self.start_music()
         self.apply_difficulty()
         self.apply_bunker_bonuses_to_levels()
+        self.mouse_locked = False
 
     def build_levels(self):
         return [factory() for factory in self.level_factories]
@@ -2798,6 +2995,32 @@ class Game:
         self.fullscreen = not self.fullscreen
         flags = pygame.FULLSCREEN if self.fullscreen else 0
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+        self.update_mouse_lock(force=True)
+
+    def should_lock_mouse(self):
+        return self.state == "playing"
+
+    def force_center_mouse(self):
+        if not self.mouse_locked:
+            return
+        center = (WIDTH // 2, HEIGHT // 2)
+        pygame.mouse.set_pos(center)
+        if hasattr(pygame.mouse, "get_rel"):
+            pygame.mouse.get_rel()
+
+    def update_mouse_lock(self, force=False):
+        lock_mouse = self.should_lock_mouse()
+        if force or lock_mouse != self.mouse_locked:
+            if hasattr(pygame.mouse, "set_relative_mode"):
+                try:
+                    pygame.mouse.set_relative_mode(lock_mouse)
+                except pygame.error:
+                    pass
+            pygame.event.set_grab(lock_mouse)
+            pygame.mouse.set_visible(not lock_mouse)
+            self.mouse_locked = lock_mouse
+        if lock_mouse:
+            self.force_center_mouse()
 
     def reset_level(self, index=None):
         target_index = self.level_index if index is None else index
@@ -2838,6 +3061,7 @@ class Game:
     def finish_death_restart(self):
         self.reset_level(self.level_index)
         self.state = "playing"
+        self.update_mouse_lock(force=True)
         self.overlay_text = f"Level {self.level_index + 1}"
         self.banner_timer = 2.2
 
@@ -2853,6 +3077,7 @@ class Game:
         self.apply_bunker_bonuses_to_levels()
         self.clear_progress()
         self.state = "playing"
+        self.update_mouse_lock(force=True)
         self.overlay_text = "Level 1"
         self.banner_timer = 3.0
         self.death_timer = 0.0
@@ -2870,6 +3095,7 @@ class Game:
         self.apply_difficulty()
         self.apply_bunker_bonuses_to_levels()
         self.state = "playing"
+        self.update_mouse_lock(force=True)
         self.overlay_text = f"Level {self.level_index + 1}"
         self.banner_timer = 3.0
         self.death_timer = 0.0
@@ -2881,6 +3107,7 @@ class Game:
             self.state = "paused"
         elif self.state == "paused":
             self.state = "playing"
+        self.update_mouse_lock(force=True)
 
     def draw_death_notice(self):
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -3319,9 +3546,23 @@ class Game:
             heading = "The diary is decoded. The twins escape." if victory else "The bunker wins this round."
         panel = pygame.Rect(WIDTH // 2 - 420, 150, 840, 360)
         draw_note_panel(self.screen, panel, pin_color=(152, 52, 42), alpha=226)
-        color = (154, 104, 44) if victory else (126, 38, 32)
-        title = self.fonts["title"].render(heading, True, color)
-        self.screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 34))
+        accent = (154, 104, 44) if victory else (126, 38, 32)
+        title = self.fonts["title"].render(heading, True, accent)
+        self.screen.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 30))
+
+        badge = pygame.Rect(panel.centerx - 92, panel.y + 92, 184, 34)
+        draw_note_panel(self.screen, badge, pin_color=(168, 62, 46), alpha=210)
+        badge_text = "Victory" if victory else "Defeat"
+        badge_color = (112, 76, 36) if victory else (108, 42, 34)
+        badge_render = self.fonts["body"].render(badge_text, True, badge_color)
+        self.screen.blit(badge_render, (badge.centerx - badge_render.get_width() // 2, badge.y + 5))
+
+        icon_rect = pygame.Rect(panel.x + 48, panel.y + 56, 112, 148)
+        if victory:
+            draw_portal(self.screen, icon_rect.inflate(-18, -10), 0.92 if self.true_ending else 0.72)
+        else:
+            draw_rift(self.screen, icon_rect.inflate(-20, -8), 1.6)
+
         lines = ["Press R to restart the whole adventure.", "Press Esc to close the game."]
         if victory:
             if self.true_ending:
@@ -3329,9 +3570,20 @@ class Game:
                 lines.insert(1, "Stan stabilizes the portal, Dipper locks the breach, and Bill's shadow cannot return.")
             else:
                 lines.insert(0, "Stan opens the tear, the portal stabilizes, and Bill's shadow fades.")
-        for i, line in enumerate(lines):
-            text = self.fonts["small"].render(line, True, (88, 60, 40))
-            self.screen.blit(text, (panel.centerx - text.get_width() // 2, panel.y + 138 + i * 46))
+        body_color = (88, 60, 40)
+        text_left = panel.x + 186
+        text_top = panel.y + 146
+        text_width = panel.width - 236
+        text_y = text_top
+        line_gap = 12
+        paragraph_gap = 18
+        for idx, paragraph in enumerate(lines):
+            wrapped = render_wrapped_lines(self.fonts["body"], paragraph, body_color, text_width)
+            for rendered in wrapped:
+                self.screen.blit(rendered, (text_left, text_y))
+                text_y += rendered.get_height() + line_gap
+            if idx < len(lines) - 1:
+                text_y += paragraph_gap
 
     def open_cipher_puzzle(self, cipher_id):
         if not isinstance(self.current_level, BunkerLevel):
@@ -3574,6 +3826,7 @@ class Game:
         running = True
         while running:
             dt = self.clock.tick(FPS) / 1000
+            self.update_mouse_lock()
             keys = pygame.key.get_pressed()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -3642,6 +3895,14 @@ class Game:
                 self.draw_end(True)
             self.draw_film_overlay()
             pygame.display.flip()
+            self.force_center_mouse()
+        if hasattr(pygame.mouse, "set_relative_mode"):
+            try:
+                pygame.mouse.set_relative_mode(False)
+            except pygame.error:
+                pass
+        pygame.event.set_grab(False)
+        pygame.mouse.set_visible(True)
         pygame.quit()
 
 
